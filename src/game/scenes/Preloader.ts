@@ -385,7 +385,7 @@ export class Preloader extends Scene
 
 	private refreshLocalizedPreloaderText(): void {
 		const demoLabel = localizationManager.getTextByKey(CLOCK_DEMO) ?? LOCALIZATION_DEFAULTS[CLOCK_DEMO] ?? 'DEMO';
-		const suffixText = ` | Beelze_Bop${this.gameAPI.getDemoState() ? ` | ${demoLabel}` : ''}`;
+		const suffixText = ` | Mars Triumph${this.gameAPI.getDemoState() ? ` | ${demoLabel}` : ''}`;
 		this.clockDisplay?.setSuffixText(suffixText);
 
 		const maxWinLabel = localizationManager.getTextByKey(PRELOADER_MAX_WIN) ?? LOCALIZATION_DEFAULTS[PRELOADER_MAX_WIN] ?? 'Win up to';

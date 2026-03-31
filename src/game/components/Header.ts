@@ -9,14 +9,25 @@ import { localizationManager } from '../../managers/LocalizationManager';
 import { LOCALIZATION_DEFAULTS, WINBAR_TOTAL_WIN, WINBAR_YOU_WON } from '../../backend/LocalizationData';
 
 export class Header {
-	private headerContainer: Phaser.GameObjects.Container;
+	private headerContainer!: Phaser.GameObjects.Container;
 	private networkManager: NetworkManager;
 	private screenModeManager: ScreenModeManager;
-	private amountText: Phaser.GameObjects.Text;
-	private youWonText: Phaser.GameObjects.Text;
+	private amountText!: Phaser.GameObjects.Text;
+	private youWonText!: Phaser.GameObjects.Text;
 	private currentWinnings: number = 0;
 	private pendingWinnings: number = 0;
 	private scene: Scene | null = null;
+	private normalWinbarImage?: Phaser.GameObjects.Image;
+	private headerLogoImage?: Phaser.GameObjects.Image;
+
+	// Header logo tuning (1 = 100% / no change)
+	private readonly HEADER_LOGO_SCALE_MULTIPLIER: number = .4;
+	// Normal winbar tuning (1 = 100% / no change)
+	private readonly NORMAL_WINBAR_SCALE_MULTIPLIER: number = 1.2;
+	// Normal winbar vertical nudge in pixels (positive = down, negative = up)
+	private readonly NORMAL_WINBAR_OFFSET_Y_PX: number = 60;
+  //Win bar text y offset from center of winbar in pixels (positive = down, negative = up)
+  private readonly WINBAR_TEXT_OFFSET_Y_PX: number = 90;
 
 	constructor(networkManager: NetworkManager, screenModeManager: ScreenModeManager) {
 		this.networkManager = networkManager;
@@ -36,6 +47,8 @@ export class Header {
 		
 		// Create main container for all header elements
 		this.headerContainer = scene.add.container(0, 0);
+		// Keep header container above controller cover (normal-bg-cover depth is 850).
+		this.headerContainer.setDepth(1);
 		
 		const screenConfig = this.screenModeManager.getScreenConfig();
 		const assetScale = this.networkManager.getAssetScale();
@@ -54,12 +67,70 @@ export class Header {
 
 	private createHeaderElements(scene: Scene, assetScale: number): void {
 
-		// Add logo
+		// Add normal winbar first so it sits behind the logo inside the container
+		if (scene.textures.exists('normal_winbar')) {
+			const winbar = scene.add.image(0, 0, 'normal_winbar')
+				.setOrigin(0.5, 0.5)
+				.setScrollFactor(0);
+			this.normalWinbarImage = winbar;
+			this.headerContainer.add(winbar);
+		}
+
+		// Add logo if the texture is available
+		if (scene.textures.exists('header_logo')) {
+			const logoX = scene.scale.width * 0.5;
+			const logoY = scene.scale.height * 0.08;
+			const logo = scene.add.image(logoX, logoY, 'header_logo')
+				.setOrigin(0.5, 0.5)
+				.setScrollFactor(0);
+
+			// Fit logo to screen width with a comfortable margin
+			const maxWidth = scene.scale.width * 0.85;
+			if (logo.width > maxWidth && logo.width > 0) {
+				logo.setScale((maxWidth / logo.width) * this.HEADER_LOGO_SCALE_MULTIPLIER);
+			} else if (logo.width > 0) {
+				logo.setScale(this.HEADER_LOGO_SCALE_MULTIPLIER);
+			}
+
+			this.headerLogoImage = logo;
+			this.headerContainer.add(logo);
+		}
+
+		// Ensure winbar and logo are positioned/scaled correctly
+		this.layoutHeaderArt(scene);
 		
 		// Add winnings text centered on the win bar
 		this.createWinBarText(scene, scene.scale.width * 0.5, scene.scale.height * 0.1
 		);
 		
+	}
+
+	private layoutHeaderArt(scene: Scene): void {
+		const width = scene.scale.width;
+		const height = scene.scale.height;
+
+		// Winbar sits behind the win texts (texts are drawn directly to scene at depth 602)
+		if (this.normalWinbarImage) {
+			const x = width * 0.5;
+			const y = (height * 0.11) + this.NORMAL_WINBAR_OFFSET_Y_PX;
+			this.normalWinbarImage.setPosition(x, y);
+
+			const maxWidth = width * 0.82;
+			if (this.normalWinbarImage.width > 0) {
+				const baseScale = (this.normalWinbarImage.width > maxWidth)
+					? (maxWidth / this.normalWinbarImage.width)
+					: 1;
+				const scale = baseScale * this.NORMAL_WINBAR_SCALE_MULTIPLIER;
+				this.normalWinbarImage.setScale(scale);
+			}
+		}
+
+		// Keep logo centered above the bar
+		if (this.headerLogoImage) {
+			const logoX = width * 0.5;
+			const logoY = height * 0.08;
+			this.headerLogoImage.setPosition(logoX, logoY);
+		}
 	}
 
 	// private createCharacterSpineAnimation(scene: Scene, assetScale: number): void {}
@@ -70,7 +141,7 @@ export class Header {
 
 	private createWinBarText(scene: Scene, x: number, y: number): void {
 		// Line 1: "YOU WON"
-		this.youWonText = scene.add.text(x, y - 7, this.getWinBarText(WINBAR_YOU_WON), {
+		this.youWonText = scene.add.text(x, y - 7 + this.WINBAR_TEXT_OFFSET_Y_PX, this.getWinBarText(WINBAR_YOU_WON), {
 			fontSize: '18px',
 			color: '#ffffff',
 			fontFamily: 'Poppins-Bold',
@@ -82,7 +153,7 @@ export class Header {
 		this.youWonText.setVisible(false);
 
 		// Line 2: amount value
-		this.amountText = scene.add.text(x, y + 18, '0.00', {
+		this.amountText = scene.add.text(x, y + 18 + this.WINBAR_TEXT_OFFSET_Y_PX, '0.00', {
 			fontSize: '24px',
 			color: '#00ff00',
 			fontFamily: 'Poppins-Bold',
@@ -98,6 +169,7 @@ export class Header {
 		if (this.headerContainer) {
 			this.headerContainer.setSize(scene.scale.width, scene.scale.height);
 		}
+		this.layoutHeaderArt(scene);
 	}
 
 	getContainer(): Phaser.GameObjects.Container {

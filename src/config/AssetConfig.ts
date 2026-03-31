@@ -62,8 +62,8 @@ export class AssetConfig {
 
 		return {
 			images: {
-				// Removed sugar wonderland logo ('header-logo')
-				// Add more header images here
+				'header_logo': `${prefix}/header/header_logo.webp`,
+				'normal_winbar': `${prefix}/header/normal_winbar.webp`,
 			},
 			spine: {
 				// Removed cat and win-bar assets from header
@@ -76,7 +76,11 @@ export class AssetConfig {
 		const prefix = this.getAssetPrefix();
 
 		return {
-			images: {},
+			images: {
+				// Reuse the same logo for bonus header.
+				'bonus_header_logo': `${prefix}/header/header_logo.webp`,
+				'bonus_winbar': `${prefix}/header/bonus_winbar.webp`,
+			},
 			spine: {}
 		};
 	}
@@ -87,7 +91,9 @@ export class AssetConfig {
 
 		return {
 			images: {
-				'loading_background': `${prefix}/background/LoadingScreen_BZ.png`,
+				// NOTE: The underlying asset file is currently named LoadingScreen_BZ.png.
+				// If art updates introduce LoadingScreen.png, update this path accordingly.
+				'loading_background': `${prefix}/background/LoadingScreen.webp`,
 				'button_bg': `${prefix}/loading/button_bg.png`,
 				'button_spin': `${prefix}/loading/button_spin.png`,
 				// Preloader logo (fixed portrait/high path so it always exists regardless of network tier)
@@ -105,7 +111,7 @@ export class AssetConfig {
 			},
 			audio: {
 				// Boot-load the transition whistle so it is ready before the Preloader play button is shown.
-				'whistle_bz': 'assets/sounds/SFX/whistle_BB.ogg'
+				'whistle': 'assets/sounds/SFX/whistle_BB.ogg'
 			}
 		};
 	}
@@ -364,12 +370,7 @@ export class AssetConfig {
 	getForegroundAssets(): AssetGroup {
 		const prefix = this.getAssetPrefix();
 		return {
-			spine: {
-				'Old_Filter_Overlay': {
-					atlas: `${prefix}/foreground/Old_Filter_Overlay.atlas`,
-					json: `${prefix}/foreground/Old_Filter_Overlay.json`
-				}
-			}
+			spine: {}
 		};
 	}
 
@@ -435,37 +436,38 @@ export class AssetConfig {
 		return {
 			audio: {
 				// Menu/UI clicks
-				'click_bz': 'assets/sounds/SFX/click_1.ogg',
+				'click': 'assets/sounds/SFX/click_1.ogg',
 				//BG sounds
-				'mainbg_bz': 'assets/sounds/BG/mainbg_BB.ogg',
-				'bonusbg_bz': 'assets/sounds/BG/bonusbg_BB.ogg',
-				'freespinbg_bz': 'assets/sounds/BG/freespinwonbg_BB.ogg',
-				'spinb_bz': 'assets/sounds/SFX/spin_BB.ogg',
-				'reeldrop_bz': 'assets/sounds/SFX/reeldrop_BB.ogg',
-				'scatterdrop1_bz': 'assets/sounds/SFX/symbol_win/scatter_drop_1.ogg',
-				'scatterdrop2_bz': 'assets/sounds/SFX/symbol_win/scatter_drop_2.ogg',
-				'scatterdrop3_bz': 'assets/sounds/SFX/symbol_win/scatter_drop_3.ogg',
-				'scatterdrop4_bz': 'assets/sounds/SFX/symbol_win/scatter_drop_4.ogg',
-				'turbodrop_bz': 'assets/sounds/SFX/turbodrop_BB.ogg',
+				'mainbg': 'assets/sounds/BG/normalbg_MT.ogg',
+				'bonusbg': 'assets/sounds/BG/bonusbg_MT.ogg',
+				'freespinbg': 'assets/sounds/BG/freespinbg_MT.ogg',
+				'spinb': 'assets/sounds/SFX/spin_MT.ogg',
+				'reeldrop': 'assets/sounds/SFX/reeldrop_MT.ogg',
+				'scatterdrop1': 'assets/sounds/SFX/symbol_win/scatter_drop_1.ogg',
+				'scatterdrop2': 'assets/sounds/SFX/symbol_win/scatter_drop_2.ogg',
+				'scatterdrop3': 'assets/sounds/SFX/symbol_win/scatter_drop_3.ogg',
+				'scatterdrop4': 'assets/sounds/SFX/symbol_win/scatter_drop_4.ogg',
+				'turbodrop': 'assets/sounds/SFX/turbodrop_MT.ogg',
 				// Scatter win SFX (paper_roll) – played when scatter win animation runs
-				'paper_roll_bz': 'assets/sounds/SFX/paper_roll_BB.ogg',
+				'paper_roll': 'assets/sounds/SFX/paper_roll_BB.ogg',
 				// Multiplier trigger / bomb SFX (bonus-mode multipliers)
-				'bomb_bz': 'assets/sounds/SFX/tbomb_BB.ogg',
-				'tbomb_bz': 'assets/sounds/SFX/tbomb_BB.ogg',
+				'bomb': 'assets/sounds/SFX/tbomb_MT.ogg',
+				'tbomb': 'assets/sounds/SFX/tbomb_MT.ogg',
 				// Radial light transition whistle SFX
-				'whistle_bz': 'assets/sounds/SFX/whistle_BB.ogg',
-				'scatter_bz': 'assets/sounds/SFX/scatter_BB.ogg',
+				'whistle': 'assets/sounds/SFX/whistle_BB.ogg',
+				'scatter': 'assets/sounds/SFX/scatter_BB.ogg',
 				// Tumble symbol-win SFX (play per tumble index)
-				'twin1_bz': 'assets/sounds/SFX/symbol_win/twin1_BB.ogg',
-				'twin2_bz': 'assets/sounds/SFX/symbol_win/twin2_BB.ogg',
-				'twin3_bz': 'assets/sounds/SFX/symbol_win/twin3_BB.ogg',
-				'twin4_bz': 'assets/sounds/SFX/symbol_win/twin4_BB.ogg',
+				'hitwin1': 'assets/sounds/SFX/symbol_win/hitwin_1_MT.ogg',
+				'hitwin2': 'assets/sounds/SFX/symbol_win/hitwin_2_MT.ogg',
+				'hitwin3': 'assets/sounds/SFX/symbol_win/twin3_BB.ogg',
+				'hitwin4': 'assets/sounds/SFX/symbol_win/twin4_BB.ogg',
 				// Win dialog SFX
-				'bigw_bz': 'assets/sounds/Wins/bigw_BB.ogg',
-				'megaw_bz': 'assets/sounds/Wins/megaw_BB.ogg',
-				'superw_bz': 'assets/sounds/Wins/superw_BB.ogg',
-				'epicw_bz': 'assets/sounds/Wins/epicw_BB.ogg',
-				'congrats_bz': 'assets/sounds/Wins/congrats_BB.ogg'
+				'bigw': 'assets/sounds/Wins/bigw_MT.ogg',
+				'megaw': 'assets/sounds/Wins/megaw_MT.ogg',
+				'superw': 'assets/sounds/Wins/superw_MT.ogg',
+				'epicw': 'assets/sounds/Wins/epicw_MT.ogg',
+				'congrats': 'assets/sounds/Wins/totalw_MT.ogg',
+				'maxw': 'assets/sounds/Wins/maxw_MT.ogg'
 			}
 		};
 	}

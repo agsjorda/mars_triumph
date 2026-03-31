@@ -350,7 +350,7 @@ export class Dialogs {
 					if (typeof audioManager.duckBackground === 'function') {
 						audioManager.duckBackground(0.3);
 					}
-				} else if (type === 'congrats_bz') {
+				} else if (type === 'congrats') {
 					audioManager.playSoundEffect('dialog_congrats');
 					if (typeof audioManager.duckBackground === 'function') {
 						audioManager.duckBackground(0.3);
@@ -374,6 +374,9 @@ export class Dialogs {
 				delay: contentDelay,
 				onComplete: () => {
 					console.log('[Dialogs] Dialog content fade-in complete');
+					try {
+						scene.events.emit('dialogFullyDisplayed', this.currentDialogType);
+					} catch { }
 				}
 			});
 		}

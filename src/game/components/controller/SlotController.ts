@@ -1224,6 +1224,12 @@ export class SlotController {
 		const featureButton = this.buttons.get('feature');
 
 		if (featureButton) {
+			// Keep Buy Feature disabled while amplify/enhanced bet is active.
+			if (this.gameData?.isEnhancedBet) {
+				this.disableFeatureButton();
+				console.log('[SlotController] Skipping feature enable (enhanced bet active)');
+				return;
+			}
 			// Guard: do not re-enable during bonus or before explicit allow
 			if (gameStateManager.isBonus || !this.canEnableFeatureButton) {
 				console.log('[SlotController] Skipping feature enable (bonus active or not allowed yet)');
@@ -2710,7 +2716,8 @@ export class SlotController {
 		gameEventManager.on(GameEventType.REELS_STOP, () => {
 			console.log('[SlotController] Reels stopped event received - updating spin button state');
 			
-			// Update balance from server once per spin (REELS_STOP can fire twice: Symbols + WinLineDrawer)
+			// Update balance once per spin (REELS_STOP can fire twice: Symbols + WinLineDrawer).
+			// Workaround: prefer balance from spin payload over polling the balance API.
 			if (!gameStateManager.isScatter && !gameStateManager.isBonus) {
 				if (this.shouldDeferBalanceSyncToTotalWinDialog()) {
 					console.log('[SlotController] Skipping REELS_STOP balance sync (buy feature/TotalW_BZ flow active)');
@@ -2718,7 +2725,12 @@ export class SlotController {
 					console.log('[SlotController] Deferring REELS_STOP balance update (pending winnings will apply on WIN_STOP)');
 				} else if (!this.balanceApiCalledThisSpin) {
 					this.balanceApiCalledThisSpin = true;
-					this.updateBalanceFromServer();
+					try {
+						const spinData: any = this.gameAPI?.getCurrentSpinData?.() || (this.scene as any)?.symbols?.currentSpinData;
+						this.updateBalanceFromServer(spinData);
+					} catch {
+						this.updateBalanceFromServer();
+					}
 				} else {
 					console.log('[SlotController] Skipping duplicate balance API call (already called this spin)');
 				}
@@ -3077,10 +3089,10 @@ export class SlotController {
 					// Then, for spins that actually had a win (including tumble wins), perform a
 					// single server balance sync, guarded so we only call the API once per spin.
 					try {
-						const spinData = this.gameAPI?.getCurrentSpinData() || (this.scene as any)?.symbols?.currentSpinData;
+						const spinData = this.gameAPI?.getCurrentSpinData?.() || (this.scene as any)?.symbols?.currentSpinData;
 						if (this.spinDataHasWins(spinData) && !this.balanceApiCalledThisSpin) {
 							this.balanceApiCalledThisSpin = true;
-							this.updateBalanceFromServer();
+							this.updateBalanceFromServer(spinData);
 						}
 					} catch (e) {
 						console.warn('[SlotController] Failed WIN_STOP balance sync after applying pending update:', e);
@@ -3089,11 +3101,11 @@ export class SlotController {
 					// Fallback: if there was no queued pending update but the spin had a base win,
 					// trigger a one-time server balance refresh.
 					try {
-						const spinData = this.gameAPI?.getCurrentSpinData() || (this.scene as any)?.symbols?.currentSpinData;
+						const spinData = this.gameAPI?.getCurrentSpinData?.() || (this.scene as any)?.symbols?.currentSpinData;
 						const baseWin = spinData ? this.getBaseSpinWinForBalance(spinData as SpinData) : 0;
 						if (baseWin > 0 && !this.balanceApiCalledThisSpin) {
 							this.balanceApiCalledThisSpin = true;
-							this.updateBalanceFromServer();
+							this.updateBalanceFromServer(spinData);
 						}
 					} catch (e) {
 						console.warn('[SlotController] Failed WIN_STOP base-win balance fallback:', e);
@@ -4285,6 +4297,27 @@ export class SlotController {
 					}
 				}
 
+				// Harden against unexpected response wrappers / missing area data.
+				// Some environments can return the payload under `.data` or omit `slot.area` while still providing free-spin item areas.
+				try {
+					const anySpin: any = spinData as any;
+					if (anySpin?.data && anySpin?.data?.slot) {
+						spinData = anySpin.data as any;
+					}
+
+					const slotAny: any = (spinData as any)?.slot;
+					if (slotAny && !slotAny.area) {
+						const fs = slotAny.freespin || slotAny.freeSpin;
+						const items = Array.isArray(fs?.items) ? fs.items : [];
+						const firstArea = items[0]?.area;
+						if (Array.isArray(firstArea)) {
+							slotAny.area = firstArea;
+							(slotAny as any).paylines = (slotAny as any).paylines ?? [];
+							console.warn('[SlotController] Spin payload missing slot.area; using first free-spin item area as fallback.');
+						}
+					}
+				} catch { /* ignore */ }
+
 				// Display comprehensive spin data information
 				console.log('[SlotController] 🎰 ===== SPIN DATA RECEIVED =====');
 				console.log('[SlotController] 📊 Basic Info:');
@@ -4381,10 +4414,10 @@ export class SlotController {
 	}
 
 	/**
-	 * Update balance from server using getBalance API
+	 * Update balance (prefers spin payload balance; falls back to balance API)
 	 */
-	private async updateBalanceFromServer(): Promise<void> {
-		await this.balanceController?.updateBalanceFromServer();
+	private async updateBalanceFromServer(spinData?: any): Promise<void> {
+		await this.balanceController?.updateBalanceFromServer(spinData);
 	}
 
 	/**
@@ -4986,7 +5019,12 @@ export class SlotController {
 			// Sync from server first, then top up locally if the expected bonus credit is still missing.
 			const beforeSyncBalance = this.getBalanceAmount();
 			const expectedAfterBonus = beforeSyncBalance + bonusTotal;
-			await this.updateBalanceFromServer();
+			try {
+				const spinData: any = this.gameAPI?.getCurrentSpinData?.() || (this.scene as any)?.symbols?.currentSpinData;
+				await this.updateBalanceFromServer(spinData);
+			} catch {
+				await this.updateBalanceFromServer();
+			}
 			const afterSyncBalance = this.getBalanceAmount();
 
 			if (afterSyncBalance + 0.01 < expectedAfterBonus) {

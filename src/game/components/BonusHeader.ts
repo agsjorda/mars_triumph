@@ -11,6 +11,15 @@ export class BonusHeader {
 	private bonusHeaderContainer!: Phaser.GameObjects.Container;
 	private networkManager: NetworkManager;
 	private screenModeManager: ScreenModeManager;
+	// Header logo tuning (1 = 100% / no change)
+	private readonly HEADER_LOGO_SCALE_MULTIPLIER: number = .4;
+	private headerLogoImage?: Phaser.GameObjects.Image;
+	private bonusWinbarImage?: Phaser.GameObjects.Image;
+	// Bonus winbar tuning (same knobs as normal header winbar)
+	private readonly NORMAL_WINBAR_SCALE_MULTIPLIER: number = 1.2;
+	private readonly NORMAL_WINBAR_OFFSET_Y_PX: number = 60;
+	// Win bar text y offset from center of winbar in pixels (positive = down, negative = up)
+	private readonly WINBAR_TEXT_OFFSET_Y_PX: number = 90;
 	private amountText!: Phaser.GameObjects.Text;
 	private youWonText!: Phaser.GameObjects.Text;
 	private currentWinnings: number = 0;
@@ -56,6 +65,10 @@ export class BonusHeader {
 		
 		// Create main container for all bonus header elements
 		this.bonusHeaderContainer = scene.add.container(0, 0);
+		// Bonus header UI should only be visible during bonus mode.
+		this.bonusHeaderContainer.setVisible(false);
+		// Keep it above controller cover (850) but below overlays (9000/20000).
+		this.bonusHeaderContainer.setDepth(1);
 		
 		const screenConfig = this.screenModeManager.getScreenConfig();
 		const assetScale = this.networkManager.getAssetScale();
@@ -73,6 +86,27 @@ export class BonusHeader {
 		
 		// Initialize winnings display - start hidden
 		this.initializeWinnings();
+
+		// Visibility is controlled by bonus mode events.
+		this.setupBonusVisibilityListeners(scene);
+	}
+
+	private setupBonusVisibilityListeners(scene: Scene): void {
+		const apply = (isBonus: boolean) => {
+			try {
+				this.bonusHeaderContainer?.setVisible(!!isBonus);
+				this.headerLogoImage?.setVisible(!!isBonus);
+				this.bonusWinbarImage?.setVisible(!!isBonus);
+				if (!isBonus) {
+					this.forceHideWinningsDisplay();
+				}
+			} catch { }
+		};
+
+		scene.events.on('setBonusMode', (isBonus: boolean) => apply(!!isBonus));
+		scene.events.on('hideBonusHeader', () => apply(false));
+
+		apply(!!gameStateManager.isBonus);
 	}
 
 	private setupWinbarSuppressionListeners(scene: Scene): void {
@@ -106,6 +140,39 @@ export class BonusHeader {
 	private createPortraitBonusHeader(scene: Scene, assetScale: number): void {
 		console.log("[BonusHeader] Creating portrait bonus header layout");
 
+		// Add bonus winbar behind the logo (depth 1 behind header_logo)
+		if (scene.textures.exists('bonus_winbar')) {
+			const barX = scene.scale.width * 0.5;
+			const barY = (scene.scale.height * 0.11) + this.NORMAL_WINBAR_OFFSET_Y_PX;
+			const barDepth = 899;
+			const bar = scene.add.image(barX, barY, 'bonus_winbar')
+				.setOrigin(0.5, 0.5)
+				.setScrollFactor(0)
+				.setDepth(barDepth);
+			this.bonusWinbarImage = bar;
+			this.bonusWinbarImage.setVisible(false);
+			this.layoutBonusHeaderArt(scene);
+		}
+
+		// Add logo if the texture is available (draw directly on the scene for reliable depth)
+		if (scene.textures.exists('header_logo')) {
+			const logoX = scene.scale.width * 0.5;
+			const logoY = scene.scale.height * 0.08;
+			const logoDepth = 900; // Above controller cover (850), below overlays (9000/20000)
+			const logo = scene.add.image(logoX, logoY, 'header_logo')
+				.setOrigin(0.5, 0.5)
+				.setScrollFactor(0)
+				.setDepth(logoDepth);
+
+			const maxWidth = scene.scale.width * 0.85;
+			if (logo.width > maxWidth && logo.width > 0) {
+				logo.setScale((maxWidth / logo.width) * this.HEADER_LOGO_SCALE_MULTIPLIER);
+			} else if (logo.width > 0) {
+				logo.setScale(this.HEADER_LOGO_SCALE_MULTIPLIER);
+			}
+			this.headerLogoImage = logo;
+			this.headerLogoImage.setVisible(false);
+		}
 
 		// Create winnings text at a stable position (was inside win bar)
 		this.createWinBarText(scene, scene.scale.width * 0.5, scene.scale.height * 0.1);
@@ -114,9 +181,70 @@ export class BonusHeader {
 	private createLandscapeBonusHeader(scene: Scene, assetScale: number): void {
 		console.log("[BonusHeader] Creating landscape bonus header layout");
 
+		// Add bonus winbar behind the logo (depth 1 behind header_logo)
+		if (scene.textures.exists('bonus_winbar')) {
+			const barX = scene.scale.width * 0.5;
+			const barY = (scene.scale.height * 0.18) + this.NORMAL_WINBAR_OFFSET_Y_PX;
+			const barDepth = 899;
+			const bar = scene.add.image(barX, barY, 'bonus_winbar')
+				.setOrigin(0.5, 0.5)
+				.setScrollFactor(0)
+				.setDepth(barDepth);
+			this.bonusWinbarImage = bar;
+			this.bonusWinbarImage.setVisible(false);
+			this.layoutBonusHeaderArt(scene);
+		}
+
+		// Add logo if the texture is available
+		if (scene.textures.exists('header_logo')) {
+			const logoX = scene.scale.width * 0.5;
+			const logoY = scene.scale.height * 0.10;
+			const logoDepth = 900;
+			const logo = scene.add.image(logoX, logoY, 'header_logo')
+				.setOrigin(0.5, 0.5)
+				.setScrollFactor(0)
+				.setDepth(logoDepth);
+
+			const maxWidth = scene.scale.width * 0.85;
+			if (logo.width > maxWidth && logo.width > 0) {
+				logo.setScale((maxWidth / logo.width) * this.HEADER_LOGO_SCALE_MULTIPLIER);
+			} else if (logo.width > 0) {
+				logo.setScale(this.HEADER_LOGO_SCALE_MULTIPLIER);
+			}
+			this.headerLogoImage = logo;
+			this.headerLogoImage.setVisible(false);
+		}
 
 		// Create winnings text at a stable position
 		this.createWinBarText(scene, scene.scale.width * 0.5, scene.scale.height * 0.18);
+	}
+
+	private layoutBonusHeaderArt(scene: Scene): void {
+		const width = scene.scale.width;
+		const height = scene.scale.height;
+		const screenConfig = this.screenModeManager.getScreenConfig();
+
+		if (this.bonusWinbarImage) {
+			const x = width * 0.5;
+			const baseY = screenConfig.isPortrait ? (height * 0.11) : (height * 0.18);
+			const y = baseY + this.NORMAL_WINBAR_OFFSET_Y_PX;
+			this.bonusWinbarImage.setPosition(x, y);
+
+			const maxWidth = width * 0.82;
+			if (this.bonusWinbarImage.width > 0) {
+				const baseScale = (this.bonusWinbarImage.width > maxWidth)
+					? (maxWidth / this.bonusWinbarImage.width)
+					: 1;
+				const scale = baseScale * this.NORMAL_WINBAR_SCALE_MULTIPLIER;
+				this.bonusWinbarImage.setScale(scale);
+			}
+		}
+
+		if (this.headerLogoImage) {
+			const logoX = width * 0.5;
+			const logoY = screenConfig.isPortrait ? (height * 0.08) : (height * 0.10);
+			this.headerLogoImage.setPosition(logoX, logoY);
+		}
 	}
 
 	// Depth above RadialLightTransition overlay (20000) so Total win stays visible during candy/radial light
@@ -128,7 +256,7 @@ export class BonusHeader {
 
 	private createWinBarText(scene: Scene, x: number, y: number): void {
 		// Line 1: "YOU WON"
-		this.youWonText = scene.add.text(x, y - 7, this.getWinBarText(WINBAR_YOU_WON), {
+		this.youWonText = scene.add.text(x, y - 7 + this.WINBAR_TEXT_OFFSET_Y_PX, this.getWinBarText(WINBAR_YOU_WON), {
 			fontSize: '18px',
 			color: '#ffffff',
 			fontFamily: 'Poppins-Bold',
@@ -138,7 +266,7 @@ export class BonusHeader {
 		// Don't add to container - add directly to scene so depth works correctly
 
 		// Line 2: amount value
-		this.amountText = scene.add.text(x, y + 18, '0.00', {
+		this.amountText = scene.add.text(x, y + 18 + this.WINBAR_TEXT_OFFSET_Y_PX, '0.00', {
 			fontSize: '24px',
 			color: '#00ff00',
 			fontFamily: 'Poppins-Bold',
@@ -148,7 +276,7 @@ export class BonusHeader {
 		// Don't add to container - add directly to scene so depth works correctly
 		
 		// Store winbar center for multiplier flight target
-		(this as any).multiplierTargetY = y + 18;
+		(this as any).multiplierTargetY = y + 18 + this.WINBAR_TEXT_OFFSET_Y_PX;
 		(this as any).multiplierTargetX = x;
 		
 		// Hide by default - only show when bonus is triggered
@@ -1456,6 +1584,7 @@ export class BonusHeader {
 		if (this.bonusHeaderContainer) {
 			this.bonusHeaderContainer.setSize(scene.scale.width, scene.scale.height);
 		}
+		this.layoutBonusHeaderArt(scene);
 	}
 
 	getContainer(): Phaser.GameObjects.Container {

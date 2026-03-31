@@ -1225,9 +1225,8 @@ export class Menu {
             musicSliderBg.fillRoundedRect(sliderStartX, musicSliderY, sliderWidth * musicVol, 8 * scaleFactor, 4 * scaleFactor);
             musicValue.setText(Math.round(musicVol * 100) + '%');
 
-            // Sync music toggle state with slider value
-            // If slider reaches 0%, force toggle OFF; if >0%, ensure toggle ON
-            if (musicVol === 0) {
+            // Sync music toggle state with displayed percent (0% OFF, 1%+ ON)
+            if (Math.round(musicVol * 100) < 1) {
                 if (musicOn) {
                     musicOn = false;
                     drawToggle(musicToggleBg, musicToggleCircle, toggleX, startY + 70, musicOn);
@@ -1251,7 +1250,7 @@ export class Menu {
             sfxValue.setText(Math.round(sfxVol * 100) + '%');
 
             // Sync SFX toggle with slider value
-            if (sfxVol === 0) {
+            if (Math.round(sfxVol * 100) < 1) {
                 if (sfxOn) {
                     sfxOn = false;
                     drawToggle(sfxToggleBg, sfxToggleCircle, toggleX, startY + 190, sfxOn);

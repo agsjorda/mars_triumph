@@ -122,8 +122,8 @@ export interface LocalizationData {
 }
 
 export class GameAPI {  
-    private static readonly GAME_ID: string = '00120925';
-    private static DEMO_BALANCE: number = 10000;
+    private static readonly GAME_ID: string = '00120925'; //change to 00220126 for mars_triumph
+    private static DEMO_BALANCE: number = 100;
     private static readonly REFRESH_TOKEN_KEY: string = 'refresh_token';
 
     gameData: GameData;

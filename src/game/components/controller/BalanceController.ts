@@ -437,16 +437,53 @@ export class BalanceController {
     }
   }
 
-  public async updateBalanceFromServer(): Promise<void> {
-    if (this.callbacks.getGameAPI()?.getDemoState()) {
-      console.log('[SlotController] Demo mode active - skipping balance update from server');
+  public async updateBalanceFromServer(spinData?: any): Promise<void> {
+    const gameAPI = this.callbacks.getGameAPI();
+    const isDemo = !!gameAPI?.getDemoState();
+
+    const resolveBalanceFromSpinData = (): number | null => {
+      try {
+        const candidate = Number(spinData?.balance ?? spinData?.data?.balance);
+        return Number.isFinite(candidate) ? candidate : null;
+      } catch {
+        return null;
+      }
+    };
+
+    // Preferred path (workaround): use balance included in the spin payload to update immediately.
+    const payloadBalance = resolveBalanceFromSpinData();
+    if (payloadBalance !== null) {
+      try {
+        const oldBalance = this.getBalanceAmount();
+        console.log(`[SlotController] 💰 Balance reconcile from spin payload: $${oldBalance} -> $${payloadBalance}`);
+        if (this.balanceAnimationInProgress) {
+          this.pendingServerBalanceForReconcile = payloadBalance;
+          console.log('[SlotController] Balance animation in progress; deferring payload reconcile.');
+        } else {
+          this.startBalanceTween(payloadBalance, 200);
+        }
+        if (isDemo) {
+          try { gameAPI?.updateDemoBalance(payloadBalance); } catch { }
+        }
+        if (payloadBalance <= 0) {
+          this.callbacks.showOutOfBalancePopup();
+        }
+      } catch (error) {
+        console.error('[SlotController] ❌ Error applying payload balance:', error);
+      }
       return;
     }
 
-    try {
-      console.log('[SlotController] 💰 Updating balance from server after reels stopped...');
+    // Demo mode: no server polling. If payload didn't include balance, leave UI unchanged.
+    if (isDemo) {
+      console.log('[SlotController] Demo mode active - skipping server balance update (no payload balance)');
+      return;
+    }
 
-      const gameAPI = this.callbacks.getGameAPI();
+    // Fallback: server balance endpoint (startup / exceptional cases where payload omits balance).
+    try {
+      console.log('[SlotController] 💰 Updating balance from server...');
+
       if (!gameAPI) {
         console.warn('[SlotController] GameAPI not available for balance update');
         return;
@@ -455,12 +492,10 @@ export class BalanceController {
       const balanceResponse = await gameAPI.getBalance();
       console.log('[SlotController] Balance response received:', balanceResponse);
 
-      let newBalance = 0;
-      if (balanceResponse && balanceResponse.data && balanceResponse.data.balance !== undefined) {
-        newBalance = parseFloat(balanceResponse.data.balance);
-      } else if (balanceResponse && balanceResponse.balance !== undefined) {
-        newBalance = parseFloat(balanceResponse.balance);
-      } else {
+      const fromData = balanceResponse?.data?.balance;
+      const fromRoot = balanceResponse?.balance;
+      const newBalance = Number(fromData ?? fromRoot);
+      if (!Number.isFinite(newBalance)) {
         console.warn('[SlotController] Unexpected balance response structure:', balanceResponse);
         return;
       }
