@@ -891,7 +891,7 @@ const isDemoMode = new URLSearchParams(window.location.search).get('demo') === '
 
 ### 10. Win Dialog Auto-Close Behavior
 ```typescript
-// Win dialogs (BigW_BZ, MegaW_BZ, EpicW_BZ, SuperW_BZ) auto-close after 2.5 seconds
+// Win dialogs (BigW_MT, MegaW_MT, EpicW_MT, SuperW_MT) auto-close after 2.5 seconds
 // FreeSpinRetri_BZ (retrigger) auto-closes after 2.5 seconds
 // FreeSpin_BZ (first trigger) requires user click "press anywhere to continue"
 // TotalW_BZ requires user click "press anywhere to continue"

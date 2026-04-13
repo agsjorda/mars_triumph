@@ -248,7 +248,7 @@ export class BonusHeader {
 	}
 
 	// Depth above RadialLightTransition overlay (20000) so Total win stays visible during candy/radial light
-	private static readonly WIN_BAR_DEPTH = 20001;
+	private static readonly WIN_BAR_DEPTH = 9400;
 
 	private getWinBarText(key: string): string {
 		return localizationManager.getTextByKey(key) ?? LOCALIZATION_DEFAULTS[key] ?? key;
@@ -460,6 +460,60 @@ export class BonusHeader {
 			return items[0];
 		} catch {
 			return null;
+		}
+	}
+
+	private getCurrentFreeSpinItemIndex(spinData: any): number {
+		try {
+			const fs = spinData?.slot?.freespin || spinData?.slot?.freeSpin;
+			const items = Array.isArray(fs?.items) ? fs.items : [];
+			if (!items.length) return -1;
+
+			const slotArea = spinData?.slot?.area;
+			if (Array.isArray(slotArea)) {
+				const areaJson = JSON.stringify(slotArea);
+				return items.findIndex((item: any) =>
+					Array.isArray(item?.area) && JSON.stringify(item.area) === areaJson
+				);
+			}
+
+			const currentItem = this.getCurrentFreeSpinItem(spinData);
+			return currentItem ? items.indexOf(currentItem) : -1;
+		} catch {
+			return -1;
+		}
+	}
+
+	private hasFutureRetriggerItems(spinData: any): boolean {
+		try {
+			const fs = spinData?.slot?.freespin || spinData?.slot?.freeSpin;
+			const items = Array.isArray(fs?.items) ? fs.items : [];
+			if (items.length === 0) return false;
+			const currentIndex = this.getCurrentFreeSpinItemIndex(spinData);
+			if (currentIndex < 0 || currentIndex >= items.length - 1) return false;
+			for (let i = currentIndex + 1; i < items.length; i++) {
+				const spinsLeft = Number(items[i]?.spinsLeft ?? 0);
+				if (Number.isFinite(spinsLeft) && spinsLeft > 0) {
+					return true;
+				}
+			}
+			return false;
+		} catch {
+			return false;
+		}
+	}
+
+	private getMaxWinCapContext(spinData: any): { isMaxWinItem: boolean; capTotal: number } {
+		try {
+			const currentItem = this.getCurrentFreeSpinItem(spinData);
+			const isMaxWinItem = !!(currentItem as any)?.isMaxWin;
+			const capTotal = Number(spinData?.slot?.totalWin ?? 0);
+			return {
+				isMaxWinItem,
+				capTotal: Number.isFinite(capTotal) && capTotal > 0 ? capTotal : 0,
+			};
+		} catch {
+			return { isMaxWinItem: false, capTotal: 0 };
 		}
 	}
 
@@ -842,6 +896,9 @@ export class BonusHeader {
 		gameEventManager.on(GameEventType.TUMBLE_WIN_PROGRESS, (data: any) => {
 			try {
 				if (!gameStateManager.isBonus) return;
+				const symbolsComponent = (this.bonusHeaderContainer.scene as any).symbols;
+				const spinData = symbolsComponent?.currentSpinData;
+				const { isMaxWinItem, capTotal } = this.getMaxWinCapContext(spinData);
 				const d = data as any;
 				// Per tumble: show this step's win only (not cumulative). Legacy payloads omit tumbleWin.
 				let amount = 0;
@@ -853,6 +910,24 @@ export class BonusHeader {
 				} else {
 					amount = Number(d?.cumulativeWin ?? 0);
 				}
+
+				if (isMaxWinItem && capTotal > 0) {
+					const remaining = Math.max(0, capTotal - this.cumulativeBonusWin);
+					if (remaining <= 0) {
+						this.cumulativeBonusWin = capTotal;
+						this.hasStartedBonusTracking = true;
+						if (this.youWonText) {
+							this.youWonText.setText(this.getWinBarText(WINBAR_TOTAL_WIN));
+						}
+						this.showWinningsDisplay(capTotal);
+						if (typeof symbolsComponent?.requestSkipTumbles === 'function') {
+							symbolsComponent.requestSkipTumbles();
+						}
+						return;
+					}
+					amount = Math.min(amount, remaining);
+				}
+
 				if (amount > 0) {
 					// As soon as tumble wins start, we are in the "YOU WON" phase for this spin.
 					// Never show "TOTAL WIN" on tumble updates; that label is reserved for the
@@ -1304,33 +1379,43 @@ export class BonusHeader {
 			console.log(`[BonusHeader] WIN_STOP (bonus): finalized cumulativeBonusWin=$${this.cumulativeBonusWin} (spinWin=$${spinWin})`);
 			console.log(`[BonusHeader] WIN_STOP (bonus): multiplier status - expected=${this.expectedMultiplierCount}, received=${this.receivedMultiplierCount}, complete=${this.allMultipliersComplete}`);
 
-			// If this was the last free spin, align the cumulative total to backend totalWin
+			// Align cumulative total to backend value only when allowed by MaxWin/final-spin rules.
 			try {
-				let isFinalSpin = false;
-				if (gameStateManager.isBonusFinished) {
-					isFinalSpin = true;
-				} else {
-					const currentItem = this.getCurrentFreeSpinItem(spinData);
-					if (typeof currentItem?.spinsLeft === 'number' && currentItem.spinsLeft <= 1) {
-						isFinalSpin = true;
-					}
-					try {
-						const symbolsComponent = (this.bonusHeaderContainer.scene as any)?.symbols;
-						const rem = symbolsComponent?.freeSpinAutoplaySpinsRemaining;
-						if (typeof rem === 'number' && rem <= 0) {
-							isFinalSpin = true;
-						}
-					} catch { }
+				const currentItem = this.getCurrentFreeSpinItem(spinData);
+				const isMaxWinItem = !!(currentItem as any)?.isMaxWin;
+				const capTotal = Number(spinData?.slot?.totalWin ?? 0);
+				let isLastSpinItem = false;
+				if (typeof currentItem?.spinsLeft === 'number' && currentItem.spinsLeft <= 1) {
+					isLastSpinItem = true;
 				}
+				try {
+					const symbolsComponent = (this.bonusHeaderContainer.scene as any)?.symbols;
+					const rem = symbolsComponent?.freeSpinAutoplaySpinsRemaining;
+					if (typeof rem === 'number' && rem <= 0) {
+						isLastSpinItem = true;
+					}
+				} catch { }
 
-				if (isFinalSpin) {
-					const formulaTotal = this.getTotalWinForDisplay(spinData, true);
-					const backendTotal = this.calculateBackendTotalWin(spinData);
-					const finalTotal = Math.max(this.cumulativeBonusWin, formulaTotal, backendTotal);
+				const hasFutureRetriggerItems = this.hasFutureRetriggerItems(spinData);
+				const canUseCap = Number.isFinite(capTotal) && capTotal > 0;
+				const shouldSnapToBackendTotal =
+					(isMaxWinItem && canUseCap) ||
+					(isLastSpinItem && !hasFutureRetriggerItems);
+
+				if (shouldSnapToBackendTotal) {
+					let finalTotal = this.cumulativeBonusWin;
+					if (isMaxWinItem && canUseCap) {
+						finalTotal = capTotal;
+					} else {
+						const formulaTotal = this.getTotalWinForDisplay(spinData, true);
+						const backendTotal = this.calculateBackendTotalWin(spinData);
+						finalTotal = Math.max(this.cumulativeBonusWin, formulaTotal, backendTotal);
+					}
+
 					if (finalTotal > 0) {
 						this.cumulativeBonusWin = finalTotal;
 						this.hasStartedBonusTracking = true;
-						console.log(`[BonusHeader] WIN_STOP (bonus): aligned cumulative total for last spin=$${finalTotal} (formula=${formulaTotal}, backend=${backendTotal})`);
+						console.log(`[BonusHeader] WIN_STOP (bonus): aligned cumulative total=$${finalTotal} (isMaxWinItem=${isMaxWinItem}, isLastSpinItem=${isLastSpinItem}, hasFutureRetriggerItems=${hasFutureRetriggerItems})`);
 					}
 				}
 			} catch { }

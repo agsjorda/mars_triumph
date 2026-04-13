@@ -30,8 +30,8 @@ export const SLOT_COLUMNS: number = 6; // number of columns (vertical reels)
 export const SLOT_ROWS: number = 5; // number of rows (horizontal)
 
 /** Symbol reel center: slotY = scene.scale.height * GRID_CENTER_Y_RATIO + GRID_CENTER_Y_OFFSET_PX */
-export const GRID_CENTER_Y_RATIO = 0.56;
-export const GRID_CENTER_Y_OFFSET_PX = 0; // negative = up, positive = down
+export const GRID_CENTER_Y_RATIO = 0.4; // 0.5 = center of screen, <0.5 = higher on screen, >0.5 = lower on screen
+export const GRID_CENTER_Y_OFFSET_PX = 30; // negative = up, positive = down
 
 /** Reserved for reel-area layout tuning (static background uses centered BG-Default). negative = up, positive = down */
 export const REEL_FRAME_Y_OFFSET_PX = 0;

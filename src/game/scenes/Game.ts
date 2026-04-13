@@ -289,7 +289,7 @@ export class Game extends Scene {
 			alpha: 0.5,
 			depth: 30000,
 			scale: 0.7,
-			suffixText: ` | Beelze_Bop${this.gameAPI.getDemoState() ? ` | ${localizedDemoLabel}` : ''}`,
+			suffixText: ` | Mars Triumph${this.gameAPI.getDemoState() ? ` | ${localizedDemoLabel}` : ''}`,
 			additionalText: 'DiJoker',
 			additionalTextOffsetX: 5,
 			additionalTextOffsetY: 0,
@@ -319,8 +319,8 @@ export class Game extends Scene {
 		this.winTracker.create(this);
 		// ADJUST HERE: WinTracker position and icon size
 		// offsetY: negative values move it UP, positive values move it DOWN (default: -45)
-		// iconScale: size of symbol icons (default: 0.3, current: 0.05)
-		this.winTracker.setLayout({ iconScale: 0.02, offsetY: -115 });
+		// iconScale: size of symbol icons (default: 0.3, current: 0.2)
+		this.winTracker.setLayout({ iconScale: 0.2, offsetY: 130 });
 		console.log(`[Game] Creating symbols...`);
 		this.symbols.create(this);
 
@@ -1315,22 +1315,22 @@ export class Game extends Scene {
 		// Determine which win dialog to show based on configured thresholds
 		if (multiplier >= WIN_THRESHOLDS.SUPER_WIN) {
 			console.log(
-				`[Game] Super Win! Showing SuperW_BZ dialog for ${multiplier.toFixed(2)}x multiplier (staged inside dialog)`
+				`[Game] Super Win! Showing SuperW_MT dialog for ${multiplier.toFixed(2)}x multiplier (staged inside dialog)`
 			);
 			this.dialogs.showSuperWin(this, { winAmount: payout, betAmount: bet });
 		} else if (multiplier >= WIN_THRESHOLDS.EPIC_WIN) {
 			console.log(
-				`[Game] Epic Win! Showing EpicW_BZ dialog for ${multiplier.toFixed(2)}x multiplier (staged inside dialog)`
+				`[Game] Epic Win! Showing EpicW_MT dialog for ${multiplier.toFixed(2)}x multiplier (staged inside dialog)`
 			);
 			this.dialogs.showLargeWin(this, { winAmount: payout, betAmount: bet });
 		} else if (multiplier >= WIN_THRESHOLDS.MEGA_WIN) {
 			console.log(
-				`[Game] Mega Win! Showing MegaW_BZ dialog for ${multiplier.toFixed(2)}x multiplier (staged inside dialog)`
+				`[Game] Mega Win! Showing MegaW_MT dialog for ${multiplier.toFixed(2)}x multiplier (staged inside dialog)`
 			);
 			this.dialogs.showMediumWin(this, { winAmount: payout, betAmount: bet });
 		} else if (multiplier >= WIN_THRESHOLDS.BIG_WIN) {
 			console.log(
-				`[Game] Big Win! Showing BigW_BZ dialog for ${multiplier.toFixed(2)}x multiplier (no staging)`
+				`[Game] Big Win! Showing BigW_MT dialog for ${multiplier.toFixed(2)}x multiplier (no staging)`
 			);
 			this.dialogs.showSmallWin(this, { winAmount: payout, betAmount: bet });
 		}

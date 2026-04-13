@@ -107,13 +107,18 @@ export class SymbolAnimations {
       // Apply additional per-symbol adjustments after fitting
       try {
         const symbolValue = (spineObj as any)?.symbolValue;
-        if (symbolValue === 0 && !gameStateManager.isBonus && !gameStateManager.isBuyFeatureSpin) {
-          // Extra 20% for scatter
+        if (symbolValue === 0) {
+          // Enforce a minimum configured scatter scale after fit-to-box.
+          const configuredScatterScale = this.getSpineSymbolScale(0);
           const sx = (spineObj as any)?.scaleX ?? 1;
           const sy = (spineObj as any)?.scaleY ?? 1;
+          const targetScaleX = isFinite(sx) && sx > 0 ? Math.max(sx, configuredScatterScale) : configuredScatterScale;
+          const targetScaleY = isFinite(sy) && sy > 0 ? Math.max(sy, configuredScatterScale) : configuredScatterScale;
           if (typeof spineObj.setScale === 'function') {
-            spineObj.setScale(sx * 1.2, sy * 1.2);
+            spineObj.setScale(targetScaleX, targetScaleY);
           }
+          // Scatter Y is applied only via Symbols.getAdjustedSymbolY (grid / tumble).
+          // Applying offset here as well doubled the shift until tumble tweens reset Y.
         }
       } catch { /* ignore */ }
     } catch { /* ignore */ }

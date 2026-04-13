@@ -16,7 +16,7 @@ const baseSymbolKey = 'symbol_';
 export const scatterSymbolKey = `${baseSymbolKey}0`;
 
 const symbolImageScaleMultiplier: Record<number, number> = {
-    0: 0.4,
+    0: 1,
     1: 1,
     2: 1,
     3: 1,

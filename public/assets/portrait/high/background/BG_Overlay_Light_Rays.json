@@ -1,0 +1,60 @@
+{
+  "skeleton": {
+    "hash": "OtYE+FXEbKw",
+    "spine": "4.2.43",
+    "x": -215.73,
+    "y": -463.07,
+    "width": 430.62,
+    "height": 926,
+    "images": "../Assets/",
+    "audio": "./audio"
+  },
+  "bones": [
+    { "name": "root" },
+    { "name": "Light_Rays", "parent": "root", "y": 128.69 }
+  ],
+  "slots": [
+    { "name": "Normal Mode", "bone": "root", "attachment": "Normal Mode" },
+    {
+      "name": "Light_Rays",
+      "bone": "Light_Rays",
+      "color": "ffffff8e",
+      "attachment": "Light_Rays_",
+      "blend": "additive"
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "Light_Rays": {
+          "Light_Rays_": {
+            "rotation": -0.15,
+            "width": 428,
+            "height": 664,
+            "sequence": { "count": 20, "start": 0, "digits": 5 }
+          }
+        },
+        "Normal Mode": {
+          "Normal Mode": { "x": -1.73, "y": -0.07, "width": 428, "height": 926 }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "animation": {
+      "attachments": {
+        "default": {
+          "Light_Rays": {
+            "Light_Rays_": {
+              "sequence": [
+                { "mode": "loop", "delay": 0.05 },
+                { "time": 0.9667, "mode": "loop", "index": 19 }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -58,10 +58,10 @@ export class SymbolFactory {
   // ============================================================================
 
   /**
-   * Create a sugar Spine symbol or PNG fallback
+    * Create a Spine symbol or PNG fallback
    * Handles symbols 0-9 (scatter and regular sugar symbols)
    */
-  public createSugarOrPngSymbol(
+  public createSpineOrPngSymbol(
     value: number,
     x: number,
     y: number,
@@ -123,8 +123,8 @@ export class SymbolFactory {
     y: number,
     alpha: number
   ): SymbolObject | null {
-    const spineKey = `symbol_${value}_sugar_spine`;
-    const atlasKey = `${spineKey}-atlas`;
+    const spineKey = this.getSymbolSpineKey(value);
+    const atlasKey = this.getSpineAtlasKey(spineKey);
     
     // Check if add.spine exists
     if (typeof (this.scene.add as any).spine !== 'function') {
@@ -165,7 +165,7 @@ export class SymbolFactory {
    */
   private playIdleAnimation(spineObj: any, value: number): void {
     try {
-      const idleName = `Symbol${value}_BZ_idle`;
+      const idleName = `Symbol${value}_MT_idle`;
       
       const animState = spineObj.animationState;
       if (!animState || typeof animState.setAnimation !== 'function') {
@@ -208,7 +208,7 @@ export class SymbolFactory {
     const idleName = MultiplierSymbols.getIdleAnimationName(value);
     if (!idleName) return null;
     
-    const spineKey = 'symbol_10_sugar_spine';
+    const spineKey = this.getSymbolSpineKey(10);
     const atlasKey = `${spineKey}-atlas`;
     
     // Check if add.spine exists
@@ -354,8 +354,8 @@ export class SymbolFactory {
     const x = currentSymbol.x;
     const y = currentSymbol.y;
     
-    const spineKey = `symbol_${symbolValue}_spine`;
-    const atlasKey = `${spineKey}-atlas`;
+    const spineKey = this.getSymbolSpineKey(symbolValue);
+    const atlasKey = this.getSpineAtlasKey(spineKey);
     
     try {
       console.log(`[SymbolFactory] Replacing sprite with Spine: ${spineKey} at (${col}, ${row})`);
@@ -424,5 +424,13 @@ export class SymbolFactory {
     
     // Create PNG replacement
     return this.createPngSymbol(symbolValue, x, y, 1);
+  }
+
+  private getSymbolSpineKey(value: number): string {
+    return `symbol_${value}_spine`;
+  }
+
+  private getSpineAtlasKey(spineKey: string): string {
+    return `${spineKey}-atlas`;
   }
 }

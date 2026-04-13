@@ -17,6 +17,8 @@ export enum SoundEffectType {
 	// Scatter win SFX (Symbol0 win animation – paper_roll)
 	SCATTER_NOMNOM = 'scatter_nomnom',
 	MENU_CLICK = 'menu_click',
+	/** Token / balance / system popups (reuses click asset; dedicated file optional) */
+	POPUP_OPEN = 'popup_open',
 	SPIN_CLICK = 'spin_click',
 	MULTIPLIER_TRIGGER = 'multitrigger',
 	WHISTLE_BB = 'whistle_bb',
@@ -140,6 +142,13 @@ export class AudioManager {
 				console.log('[AudioManager] Menu click SFX instance created');
 			} catch (e) {
 				console.warn('[AudioManager] Failed to create click_bz SFX instance:', e);
+			}
+			try {
+				const popupOpenSfx = this.scene.sound.add('click', { volume: this.sfxVolume, loop: false });
+				this.sfxInstances.set(SoundEffectType.POPUP_OPEN, popupOpenSfx);
+				console.log('[AudioManager] Popup open SFX instance created (click)');
+			} catch (e) {
+				console.warn('[AudioManager] Failed to create popup_open SFX instance:', e);
 			}
 			// Spin click SFX (louder than background music)
 			try {
@@ -862,12 +871,16 @@ export class AudioManager {
 
 		switch (t) {
 			case 'bigw':
+			case 'bigw_mt':
 				effect = SoundEffectType.BIG_WIN; break;
 			case 'megaw':
+			case 'megaw_mt':
 				effect = SoundEffectType.MEGA_WIN; break;
 			case 'superw':
+			case 'superw_mt':
 				effect = SoundEffectType.SUPER_WIN; break;
 			case 'epicw':
+			case 'epicw_mt':
 				effect = SoundEffectType.EPIC_WIN; break;
 			case 'maxw_bz':
 			case 'maxw':

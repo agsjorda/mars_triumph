@@ -34,7 +34,7 @@ export class WinTracker {
   private baseX: number = 0;
   private baseY: number = 0;
   private offsetX: number = 0;
-  private offsetY: number = -45;
+  private offsetY: number = 0;
   private itemSpacing: number = 80;
   private iconScale: number = 0.01;
   private innerGap: number = 13;

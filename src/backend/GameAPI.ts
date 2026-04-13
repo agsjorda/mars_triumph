@@ -4,6 +4,26 @@ import { gameStateManager } from "../managers/GameStateManager";
 import { SoundEffectType } from "../managers/AudioManager";
 import { SLOT_COLUMNS, SLOT_ROWS } from "../config/GameConfig";
 
+const spinDataSampleAssetUrls = import.meta.glob("../game/spinDataSample/*.json", {
+    query: '?url',
+    import: 'default',
+    eager: true,
+}) as Record<string, string>;
+
+const SAMPLE_DATA_URL_BY_NAME: Record<string, string> = Object.fromEntries(
+    Object.entries(spinDataSampleAssetUrls).map(([path, url]) => {
+        const fileName = path.split(/[\\/]/).pop() || path;
+        const key = fileName.replace(/\.json$/i, '');
+        return [key, String(url)];
+    })
+);
+
+function getSpinDataSampleAssetUrl(fileName: string): string | null {
+    const normalizedFileName = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
+    const match = Object.entries(spinDataSampleAssetUrls).find(([path]) => path.endsWith(`/${normalizedFileName}`));
+    return match?.[1] || null;
+}
+
 /**
  * Function to parse URL query parameters
  * @param name - The name of the parameter to retrieve
@@ -123,7 +143,7 @@ export interface LocalizationData {
 
 export class GameAPI {  
     private static readonly GAME_ID: string = '00120925'; //change to 00220126 for mars_triumph
-    private static DEMO_BALANCE: number = 100;
+    private static DEMO_BALANCE: number = 10000;
     private static readonly REFRESH_TOKEN_KEY: string = 'refresh_token';
 
     gameData: GameData;
@@ -151,7 +171,7 @@ export class GameAPI {
         new URLSearchParams(window.location.search).get('testMode') === 'true' ||
         localStorage.getItem('testMode') === 'true';
 
-    // Fake data mode: load spins from /fake_spin_data.json (public)
+    // Fake data mode: fetch spins from a built asset URL generated from src/game/spinDataSample/fake_spin_data.json
     // Enable via URL parameter ?useFakeData=true or localStorage.setItem('useFakeData','true')
     private static readonly USE_FAKE_DATA_ENABLED: boolean =
         new URLSearchParams(window.location.search).get('useFakeData') === 'true' ||
@@ -161,6 +181,49 @@ export class GameAPI {
     private fakeSpinLoadPromise: Promise<{ normalGame?: any[]; bonusGame?: any[] } | null> | null = null;
     private fakeNormalSpinIndex: number = 0;
     private fakeBonusSpinIndex: number = 0;
+    private sampleDataCache: Record<string, { normalGame?: any[]; bonusGame?: any[] } | null> = {};
+    private sampleDataLoadPromise: Record<string, Promise<{ normalGame?: any[]; bonusGame?: any[] } | null>> = {};
+
+    private getSampleDataKey(): string | null {
+        const params = new URLSearchParams(window.location.search);
+        const paramKey = params.get('sampleData');
+        const storageKey = localStorage.getItem('sampleData');
+        const explicitKey = paramKey || storageKey;
+        if (explicitKey) {
+            return explicitKey.replace(/\.json$/i, '');
+        }
+
+        const useMaxWin = params.get('useMaxWin') === 'true' || localStorage.getItem('useMaxWin') === 'true';
+        if (useMaxWin) {
+            return 'max_win_data';
+        }
+
+        const useFakeData = params.get('useFakeData') === 'true' || localStorage.getItem('useFakeData') === 'true';
+        if (useFakeData) {
+            return 'fake_spin_data';
+        }
+
+        return null;
+    }
+
+    private getSampleDataUrl(): string | null {
+        const key = this.getSampleDataKey();
+        if (!key) return null;
+        return SAMPLE_DATA_URL_BY_NAME[key] || null;
+    }
+
+    private isSampleDataEnabled(): boolean {
+        return !!this.getSampleDataUrl();
+    }
+
+    private isFakeDataModeEnabled(): boolean {
+        return this.isSampleDataEnabled();
+    }
+
+    private isDemoOrFakeMode(): boolean {
+        const isDemo = this.getDemoState() || localStorage.getItem('demo') === 'true' || sessionStorage.getItem('demo') === 'true';
+        return isDemo || this.isFakeDataModeEnabled();
+    }
     
     // Test data to be used when test mode is enabled
     private static readonly TEST_SPIN_DATA: any = {
@@ -263,31 +326,158 @@ export class GameAPI {
     }   
 
     private async loadFakeSpinData(): Promise<{ normalGame?: any[]; bonusGame?: any[] } | null> {
-        if (this.fakeSpinData) return this.fakeSpinData;
-        if (this.fakeSpinLoadPromise) return this.fakeSpinLoadPromise;
+        const key = this.getSampleDataKey();
+        const url = this.getSampleDataUrl();
+        if (!key || !url) {
+            return null;
+        }
+        const normalizedKey = key.replace(/\.json$/i, '');
 
-        this.fakeSpinLoadPromise = (async () => {
+        if (Object.prototype.hasOwnProperty.call(this.sampleDataCache, normalizedKey)) {
+            this.fakeSpinData = this.sampleDataCache[normalizedKey];
+            return this.fakeSpinData;
+        }
+
+        if (this.sampleDataLoadPromise[normalizedKey]) {
+            this.fakeSpinData = await this.sampleDataLoadPromise[normalizedKey];
+            return this.fakeSpinData;
+        }
+
+        this.sampleDataLoadPromise[normalizedKey] = (async () => {
             try {
-                const res = await fetch('/fake_spin_data.json', { cache: 'no-store' });
+                const res = await fetch(url, { cache: 'no-store' });
                 if (!res.ok) {
+                    this.sampleDataCache[normalizedKey] = null;
                     return null;
                 }
-                const data = await res.json();
-                this.fakeSpinData = data || null;
-                return this.fakeSpinData;
+                const rawData = await res.json();
+                const normalizedData = this.normalizeFakeSpinDataShape(rawData);
+                this.sampleDataCache[normalizedKey] = normalizedData;
+                return normalizedData;
             } catch (e) {
+                this.sampleDataCache[normalizedKey] = null;
                 return null;
             }
         })();
 
-        return this.fakeSpinLoadPromise;
+        this.fakeSpinData = await this.sampleDataLoadPromise[normalizedKey];
+        return this.fakeSpinData;
+    }
+
+    private normalizeFakeSpinDataShape(rawData: any): { normalGame?: any[]; bonusGame?: any[] } | null {
+        if (!rawData || typeof rawData !== 'object') {
+            return null;
+        }
+
+        const hasNamedLists =
+            Array.isArray(rawData.normalGame) ||
+            Array.isArray(rawData.bonusGame);
+        if (hasNamedLists) {
+            const normalGame = Array.isArray(rawData.normalGame) ? rawData.normalGame : [];
+            const bonusGame = Array.isArray(rawData.bonusGame) ? rawData.bonusGame : [];
+            return {
+                normalGame: normalGame.map((entry: any) => this.normalizeMaxWinItemsInSpinData(entry)),
+                bonusGame: bonusGame.map((entry: any) => this.normalizeMaxWinItemsInSpinData(entry)),
+            };
+        }
+
+        if (Array.isArray(rawData)) {
+            return {
+                normalGame: rawData.map((entry: any) => this.normalizeMaxWinItemsInSpinData(entry)),
+                bonusGame: [],
+            };
+        }
+
+        // Single spin payload fallback (common during local testing).
+        if (rawData.slot && typeof rawData.slot === 'object') {
+            return {
+                normalGame: [this.normalizeMaxWinItemsInSpinData(rawData)],
+                bonusGame: [],
+            };
+        }
+
+        // Alternate wrappers such as { data: [...] } or { spins: [...] }.
+        const wrappedList =
+            (Array.isArray(rawData.data) && rawData.data) ||
+            (Array.isArray(rawData.spins) && rawData.spins) ||
+            null;
+        if (wrappedList) {
+            return {
+                normalGame: wrappedList.map((entry: any) => this.normalizeMaxWinItemsInSpinData(entry)),
+                bonusGame: [],
+            };
+        }
+
+        return null;
+    }
+
+    private truncateFreeSpinItemsAfterFirstMaxWin(items: any[]): any[] {
+        if (!Array.isArray(items) || items.length === 0) {
+            return [];
+        }
+        const firstMaxWinIndex = items.findIndex((item: any) => !!item?.isMaxWin);
+        if (firstMaxWinIndex < 0) {
+            return items;
+        }
+        return items.slice(0, firstMaxWinIndex + 1);
+    }
+
+    private normalizeMaxWinItemsInSpinData(spinData: any): any {
+        if (!spinData || typeof spinData !== 'object') {
+            return spinData;
+        }
+        const slot = spinData.slot;
+        if (!slot || typeof slot !== 'object') {
+            return spinData;
+        }
+
+        const freespin = slot.freespin;
+        const freeSpin = slot.freeSpin;
+        const freespinItems = Array.isArray(freespin?.items) ? freespin.items : null;
+        const freeSpinItems = Array.isArray(freeSpin?.items) ? freeSpin.items : null;
+        const sourceItems = freespinItems || freeSpinItems;
+
+        if (!Array.isArray(sourceItems) || sourceItems.length === 0) {
+            return spinData;
+        }
+
+        const truncatedItems = this.truncateFreeSpinItemsAfterFirstMaxWin(sourceItems);
+        if (freespin && typeof freespin === 'object') {
+            freespin.items = truncatedItems;
+        }
+        if (freeSpin && typeof freeSpin === 'object') {
+            freeSpin.items = truncatedItems;
+        }
+        if (!slot.freespin && slot.freeSpin) {
+            slot.freespin = slot.freeSpin;
+        }
+        if (!slot.freeSpin && slot.freespin) {
+            slot.freeSpin = slot.freespin;
+        }
+        return spinData;
     }
 
     private getNextFakeSpin(isBonus: boolean, bet: number): SpinData | null {
-        const data = this.fakeSpinData;
+        const data: any = this.fakeSpinData as any;
         if (!data) return null;
-        const list = isBonus ? (data.bonusGame || []) : (data.normalGame || []);
-        if (!Array.isArray(list) || list.length === 0) return null;
+
+        const preferredList = isBonus ? data.bonusGame : data.normalGame;
+        const fallbackList = isBonus ? data.normalGame : data.bonusGame;
+
+        const normalizeToList = (value: any): any[] => {
+            if (Array.isArray(value)) return value;
+            if (value && typeof value === 'object') return [value];
+            return [];
+        };
+
+        let list = normalizeToList(preferredList);
+        if (list.length === 0) {
+            list = normalizeToList(fallbackList);
+        }
+        if (list.length === 0 && data.slot && typeof data.slot === 'object') {
+            list = [data];
+        }
+        if (list.length === 0) return null;
 
         const idx = isBonus ? this.fakeBonusSpinIndex : this.fakeNormalSpinIndex;
         const next = list[idx % list.length];
@@ -317,6 +507,14 @@ export class GameAPI {
             }
         }
         return cloned as SpinData;
+    }
+
+    private getFakeSpinForRequest(bet: number, isBuyFs: boolean): SpinData | null {
+        const useBonusList = !!gameStateManager.isBonus || isBuyFs;
+        return this.getNextFakeSpin(useBonusList, bet)
+            || (isBuyFs ? this.getNextFakeSpin(false, bet) : null)
+            || this.getNextFakeSpin(false, bet)
+            || this.getNextFakeSpin(true, bet);
     }
 
     private createMockFirstManualScatterSpinData(bet: number): SpinData {
@@ -354,8 +552,10 @@ export class GameAPI {
     }
 
     private buildFreeSpinFromItems(items: any[], baseSpin: SpinData): SpinData {
-        if (this.currentFreeSpinIndex >= items.length) {
-            const nextIdx = items.findIndex((it: any) => Number(it?.spinsLeft || 0) > 0);
+        const normalizedItems = this.truncateFreeSpinItemsAfterFirstMaxWin(items);
+
+        if (this.currentFreeSpinIndex >= normalizedItems.length) {
+            const nextIdx = normalizedItems.findIndex((it: any) => Number(it?.spinsLeft || 0) > 0);
             if (nextIdx >= 0) {
                 this.currentFreeSpinIndex = nextIdx;
             } else {
@@ -363,12 +563,12 @@ export class GameAPI {
             }
         }
 
-        let currentItem = items[this.currentFreeSpinIndex];
+        let currentItem = normalizedItems[this.currentFreeSpinIndex];
         if (!currentItem || currentItem.spinsLeft <= 0) {
-            const nextIdx = items.findIndex((it: any) => Number(it?.spinsLeft || 0) > 0);
+            const nextIdx = normalizedItems.findIndex((it: any) => Number(it?.spinsLeft || 0) > 0);
             if (nextIdx >= 0) {
                 this.currentFreeSpinIndex = nextIdx;
-                currentItem = items[this.currentFreeSpinIndex];
+                currentItem = normalizedItems[this.currentFreeSpinIndex];
             } else {
                 throw new Error('No more free spins available');
             }
@@ -386,7 +586,7 @@ export class GameAPI {
             freespin: {
                 count: baseSlot?.freespin?.count ?? baseSlot?.freeSpin?.count,
                 totalWin: baseSlot?.freespin?.totalWin ?? baseSlot?.freeSpin?.totalWin,
-                items
+                items: normalizedItems
             }
         };
         if (typeof baseMultiplierValue === 'number') {
@@ -494,7 +694,7 @@ export class GameAPI {
         localStorage.setItem('demo', isDemo ? 'true' : 'false');
         sessionStorage.setItem('demo', isDemo ? 'true' : 'false');
         
-        if (GameAPI.USE_FAKE_DATA_ENABLED) {
+        if (this.isFakeDataModeEnabled()) {
             return '';
         }
         if (isDemo) {
@@ -538,8 +738,7 @@ export class GameAPI {
      */
     public async initializeSlotSession(): Promise<SlotInitializeData> {
         // Demo mode: don't call backend; return a minimal safe payload and cache it.
-        const isDemo = this.getDemoState() || localStorage.getItem('demo') === 'true' || sessionStorage.getItem('demo') === 'true';
-        if (GameAPI.USE_FAKE_DATA_ENABLED || isDemo) {
+        if (this.isDemoOrFakeMode()) {
             const payload: SlotInitializeData = {
                 gameId: GameAPI.GAME_ID,
                 playerId: '',
@@ -895,8 +1094,7 @@ export class GameAPI {
     }
     public async getBalance(): Promise<any> {
         // Demo mode: return mock balance, no API call, no token requirement.
-        const isDemo = this.getDemoState() || localStorage.getItem('demo') === 'true' || sessionStorage.getItem('demo') === 'true';
-        if (GameAPI.USE_FAKE_DATA_ENABLED || isDemo) {
+        if (this.isDemoOrFakeMode()) {
             return {
                 data: {
                     balance: GameAPI.DEMO_BALANCE
@@ -1090,6 +1288,9 @@ export class GameAPI {
      * Try to refresh and get a new token. Returns null on any error.
      */
     private async tryRefreshAndGetNewToken(): Promise<string | null> {
+        if (this.isDemoOrFakeMode()) {
+            return null;
+        }
         try {
             return await this.refreshAccessToken();
         } catch (e) {
@@ -1134,20 +1335,20 @@ export class GameAPI {
             return this.currentSpinData;
         }
 
-        // FAKE DATA MODE: If enabled, return data from public/fake_spin_data.json
-        if (GameAPI.USE_FAKE_DATA_ENABLED) {
+        // FAKE DATA MODE: If enabled, return data fetched from src/game/spinDataSample/fake_spin_data.json
+        if (this.isFakeDataModeEnabled()) {
             const fakeData = await this.loadFakeSpinData();
-            if (fakeData) {
-                const useBonusList = !!gameStateManager.isBonus || isBuyFs;
-                let fakeSpin = this.getNextFakeSpin(useBonusList, bet);
-                if (!fakeSpin && isBuyFs) {
-                    fakeSpin = this.getNextFakeSpin(false, bet);
-                }
-                if (fakeSpin) {
-                    this.currentSpinData = fakeSpin;
-                    return this.currentSpinData;
-                }
+            if (!fakeData) {
+                throw new Error('Fake data mode is enabled, but sample data could not be loaded from spinDataSample.');
             }
+
+            const fakeSpin = this.getFakeSpinForRequest(bet, isBuyFs);
+            if (fakeSpin) {
+                this.currentSpinData = fakeSpin;
+                return this.currentSpinData;
+            }
+
+            throw new Error('Fake data mode is enabled, but no sample spin is available for this request.');
         }
 
         // Demo mode: no token required, use analytics endpoint and simplified payload.
@@ -1325,6 +1526,7 @@ export class GameAPI {
             // If this response contains free spin data, save it for bonus mode
             
             if (responseData.slot && (responseData.slot.freespin?.items || responseData.slot.freeSpin?.items)) {
+                this.normalizeMaxWinItemsInSpinData(responseData);
                 const items = responseData.slot.freespin?.items || responseData.slot.freeSpin?.items;
 
                 if (gameStateManager.isBonus && this.currentSpinData && (this.currentSpinData.slot?.freespin?.items || this.currentSpinData.slot?.freeSpin?.items)) {
@@ -1371,28 +1573,36 @@ export class GameAPI {
      * This method uses the area and paylines from the freespin items instead of calling the API
      */
     public async simulateFreeSpin(): Promise<SpinData> {
-        // Fake data mode: use bonusGame freespin items when present; otherwise return bonusGame entries.
-        if (GameAPI.USE_FAKE_DATA_ENABLED) {
+        // Fake data mode: always prefer freeSpin items (bonus list, then normal list, then current spin).
+        if (this.isFakeDataModeEnabled()) {
             const fakeData = await this.loadFakeSpinData();
-            if (fakeData) {
-                const bonusEntry = Array.isArray(fakeData.bonusGame) ? fakeData.bonusGame[0] : null;
-                const fakeItems =
-                    bonusEntry?.slot?.freespin?.items ||
-                    bonusEntry?.slot?.freeSpin?.items;
-
-                if (Array.isArray(fakeItems) && fakeItems.length > 0) {
-                    const baseSpin = (this.currentSpinData || bonusEntry) as SpinData;
-                    return this.buildFreeSpinFromItems(fakeItems, baseSpin);
-                }
-
-                const betValue = Number(this.currentSpinData?.bet || 0) || 0;
-                const fakeSpin = this.getNextFakeSpin(true, betValue);
-                if (fakeSpin) {
-                    this.currentSpinData = fakeSpin;
-                    return fakeSpin;
-                }
-            } else {
+            if (!fakeData) {
+                throw new Error('Fake data mode is enabled, but sample data could not be loaded from spinDataSample.');
             }
+
+            const bonusEntry = Array.isArray(fakeData.bonusGame) ? fakeData.bonusGame[0] : null;
+            const normalEntry = Array.isArray(fakeData.normalGame) ? fakeData.normalGame[0] : null;
+            const fakeItems =
+                bonusEntry?.slot?.freespin?.items ||
+                bonusEntry?.slot?.freeSpin?.items ||
+                normalEntry?.slot?.freespin?.items ||
+                normalEntry?.slot?.freeSpin?.items ||
+                this.currentSpinData?.slot?.freespin?.items ||
+                this.currentSpinData?.slot?.freeSpin?.items;
+
+            if (Array.isArray(fakeItems) && fakeItems.length > 0) {
+                const baseSpin = (this.currentSpinData || bonusEntry || normalEntry) as SpinData;
+                return this.buildFreeSpinFromItems(fakeItems, baseSpin);
+            }
+
+            const betValue = Number(this.currentSpinData?.bet || 0) || 0;
+            const fakeSpin = this.getFakeSpinForRequest(betValue, true);
+            if (fakeSpin) {
+                this.currentSpinData = fakeSpin;
+                return fakeSpin;
+            }
+
+            throw new Error('Fake data mode is enabled, but no bonus sample data is available for free spin simulation.');
         }
 
         if (!this.currentSpinData || (!this.currentSpinData.slot?.freespin?.items && !this.currentSpinData.slot?.freeSpin?.items)) {
@@ -1420,7 +1630,7 @@ export class GameAPI {
     }
 
     public isFakeDataEnabled(): boolean {
-        return GameAPI.USE_FAKE_DATA_ENABLED;
+        return this.isFakeDataModeEnabled();
     }
 
     /**
@@ -1460,7 +1670,7 @@ export class GameAPI {
      * This method should be called when free spins are triggered to provide the data for simulation
      */
     public setFreeSpinData(spinData: SpinData): void {
-        this.currentSpinData = spinData;
+        this.currentSpinData = this.normalizeMaxWinItemsInSpinData(spinData);
         this.resetFreeSpinIndex(); // Reset the index when setting new data
     }
 
@@ -1501,8 +1711,7 @@ export class GameAPI {
 
     public async getHistory(page: number, limit: number): Promise<any> {
         // Demo mode: return empty history without API calls.
-        const isDemo = this.getDemoState();
-        if (GameAPI.USE_FAKE_DATA_ENABLED || isDemo) {
+        if (this.isDemoOrFakeMode()) {
             return {
                 data: [],
                 meta: {

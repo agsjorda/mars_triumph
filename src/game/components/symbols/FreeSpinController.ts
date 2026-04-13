@@ -45,6 +45,7 @@ export class FreeSpinController {
   
   /** Whether dialog listener has been set up */
   private dialogListenerSetup: boolean = false;
+  private bonusEndedByMaxWin: boolean = false;
   private lastReportedSpinsLeft: number | null = null;
   /** @deprecated kept for reset() compatibility – no longer drives retrigger logic */
   private lastReportedItemsLen: number | null = null;
@@ -388,6 +389,15 @@ export class FreeSpinController {
       }
     } catch { }
 
+    try {
+      const spinData = this.callbacks.getCurrentSpinData?.();
+      if (this.isCurrentFreeSpinItemMaxWin(spinData)) {
+        console.log('[FreeSpinController] Current free-spin item is MaxWin - stopping autoplay immediately');
+        this.stopFreeSpinsAfterMaxWin();
+        return;
+      }
+    } catch { }
+
     if (this.spinsRemaining <= 0) {
       console.log('[FreeSpinController] Last free spin complete - waiting for BONUS_TOTAL_WIN_SHOWN before stopping');
 
@@ -507,10 +517,19 @@ export class FreeSpinController {
           const symbol0RetriggerPending = !!(symbolsAny && typeof symbolsAny.hasPendingSymbol0Retrigger === 'function' && symbolsAny.hasPendingSymbol0Retrigger());
           const retriggerAnimating = !!(symbolsAny && typeof symbolsAny.isScatterRetriggerAnimationInProgress === 'function' && symbolsAny.isScatterRetriggerAnimationInProgress()) || !!(symbolsAny && typeof symbolsAny.isSymbol0RetriggerAnimationInProgress === 'function' && symbolsAny.isSymbol0RetriggerAnimationInProgress());
           if (scatterRetriggerPending || symbol0RetriggerPending || retriggerAnimating) {
-            console.log('[FreeSpinController] Retrigger pending or animating - waiting for retrigger dialog before scheduling next spin');
-            this.scene.events.once('dialogAnimationsComplete', () => {
-              this.waitForAllDialogsToCloseThenResume();
-            });
+            console.log('[FreeSpinController] Retrigger pending or animating - waiting before scheduling next spin');
+            const dialogIsShowing = !!(dialogs && typeof dialogs.isDialogShowing === 'function' && dialogs.isDialogShowing()) || !!gameStateManager.isShowingWinDialog;
+            if (scatterRetriggerPending || symbol0RetriggerPending || dialogIsShowing) {
+              // Retrigger dialog hasn't appeared yet or is still open — wait for it to close
+              this.scene.events.once('dialogAnimationsComplete', () => {
+                this.waitForAllDialogsToCloseThenResume();
+              });
+            } else {
+              // Retrigger dialog closed but unmerge animation is still playing — poll until done
+              this.scene.time.delayedCall(200, () => {
+                this.waitForAllDialogsToCloseThenResume();
+              });
+            }
             return;
           }
         } catch { }
@@ -525,7 +544,14 @@ export class FreeSpinController {
         }
 
         settled = true;
-        this.scene.time.delayedCall(120, () => this.performSpin());
+        if (this.autoplayTimer) {
+          this.autoplayTimer.destroy();
+          this.autoplayTimer = null;
+        }
+        this.autoplayTimer = this.scene.time.delayedCall(120, () => {
+          this.autoplayTimer = null;
+          this.performSpin();
+        });
       });
     });
   }
@@ -594,7 +620,12 @@ export class FreeSpinController {
     }
     
     // Schedule congrats dialog
-    this.scheduleCongratsDialog();
+    if (!this.bonusEndedByMaxWin) {
+      this.scheduleCongratsDialog();
+    } else {
+      console.log('[FreeSpinController] Skipping congrats dialog because bonus ended by MaxWin');
+    }
+    this.bonusEndedByMaxWin = false;
     
     // Emit AUTO_STOP event
     gameEventManager.emit(GameEventType.AUTO_STOP);
@@ -671,9 +702,19 @@ export class FreeSpinController {
       const slotArea = spinData?.slot?.area;
       if (Array.isArray(slotArea) && items.length > 0) {
         const areaJson = JSON.stringify(slotArea);
-        const match = items.find((it: any) => Array.isArray(it?.area) && JSON.stringify(it.area) === areaJson);
-        if (match && typeof match.spinsLeft === 'number' && match.spinsLeft > 0) {
-          return { spinsLeft: match.spinsLeft, itemsLen };
+        const matchIndex = items.findIndex((it: any) => Array.isArray(it?.area) && JSON.stringify(it.area) === areaJson);
+        if (matchIndex >= 0) {
+          const match = items[matchIndex];
+          if (match && typeof match.spinsLeft === 'number' && match.spinsLeft > 0) {
+            let spinsLeft = match.spinsLeft;
+            if ((match as any)?.isMaxWin && matchIndex > 0) {
+              const prevSpinsLeft = Number(items[matchIndex - 1]?.spinsLeft ?? 0);
+              if (Number.isFinite(prevSpinsLeft) && prevSpinsLeft > 0) {
+                spinsLeft = Math.max(0, prevSpinsLeft - 1);
+              }
+            }
+            return { spinsLeft, itemsLen };
+          }
         }
       }
 
@@ -700,6 +741,47 @@ export class FreeSpinController {
     } catch {
       return { spinsLeft: 0, itemsLen: 0 };
     }
+  }
+
+  private isCurrentFreeSpinItemMaxWin(spinData: any): boolean {
+    try {
+      const fs = spinData?.slot?.freespin || spinData?.slot?.freeSpin;
+      const items = Array.isArray(fs?.items) ? fs.items : [];
+      if (items.length === 0) return false;
+
+      const slotArea = spinData?.slot?.area;
+      if (Array.isArray(slotArea)) {
+        const areaJson = JSON.stringify(slotArea);
+        const match = items.find((it: any) => Array.isArray(it?.area) && JSON.stringify(it.area) === areaJson);
+        if (match) {
+          return !!(match as any)?.isMaxWin;
+        }
+      }
+
+      const bySpins = items.find((it: any) =>
+        typeof it?.spinsLeft === 'number' &&
+        (it.spinsLeft === this.spinsRemaining || it.spinsLeft === this.spinsRemaining + 1)
+      );
+      if (bySpins) {
+        return !!(bySpins as any)?.isMaxWin;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  private stopFreeSpinsAfterMaxWin(): void {
+    this.bonusEndedByMaxWin = true;
+    this.spinsRemaining = 0;
+    this.waitingForReelsStop = false;
+    this.waitingForWinlines = false;
+    this.awaitingReelsStart = false;
+    if (this.autoplayTimer) {
+      this.autoplayTimer.destroy();
+      this.autoplayTimer = null;
+    }
+    this.stop();
   }
 
   /**
@@ -761,7 +843,7 @@ export class FreeSpinController {
       if (settled) return;
 
       const type = String(dialogType || '');
-			const isWinDialog = ['BigW_BZ', 'MegaW_BZ', 'EpicW_BZ', 'SuperW_BZ'].includes(type);
+			const isWinDialog = ['BigW_MT', 'MegaW_MT', 'EpicW_MT', 'SuperW_MT'].includes(type);
 
       if (!isWinDialog) return;
 

@@ -13,6 +13,7 @@ export interface ScatterAnimationConfig {
   spinDelay: number;
   slideDistance: number;
   dialogDelay: number;
+  scatterIdleAfterDialogDelayMs?: number;
 }
 
 export interface ScatterFlowOptions {
@@ -42,7 +43,8 @@ export class ScatterAnimationManager {
     slideInDuration: 3500,
     spinDelay: 500,
     slideDistance: 200,
-    dialogDelay: 300
+    dialogDelay: 300,
+    scatterIdleAfterDialogDelayMs: 0,
   };
 
   // Apply turbo mode to delays for consistent timing
@@ -82,82 +84,39 @@ export class ScatterAnimationManager {
     }
 
     this.isAnimating = true;
-    console.log('[ScatterAnimationManager] Starting scatter animation sequence - player will see scatter symbols for 1 second');
 
-    // While the scatter animation / free-spin intro is playing, make sure the
-    // SlotController's "spins left" display is completely hidden so it doesn't
-    // pop in early underneath the animations or dialogs.
     try {
       const gameSceneAny = this.scene as any;
       const slotController = gameSceneAny?.slotController;
       if (slotController && typeof slotController.suppressFreeSpinDisplay === 'function') {
         slotController.suppressFreeSpinDisplay();
-        console.log('[ScatterAnimationManager] Suppressed SlotController free spin display for scatter animation');
       }
     } catch (e) {
-      console.warn('[ScatterAnimationManager] Failed to suppress SlotController free spin display at scatter start:', e);
+      console.warn('[ScatterAnimationManager] Failed to suppress SlotController free spin display:', e);
     }
 
-    // Switch BG music to Free Spin track when scatter animation starts
-    // Only switch music for initial scatter triggers, not retriggers (when already in bonus mode)
     if (!gameStateManager.isBonus) {
       try {
         const audioMgr = (window as any).audioManager;
         if (audioMgr && typeof audioMgr.switchToFreeSpinMusic === 'function') {
           audioMgr.switchToFreeSpinMusic();
-          console.log('[ScatterAnimationManager] Requested switch to free spin background music');
         }
       } catch (e) {
         console.warn('[ScatterAnimationManager] Failed to switch to free spin music', e);
       }
-    } else {
-      console.log('[ScatterAnimationManager] Skipping free spin music switch - already in bonus mode (retrigger)');
     }
 
     const isBuyFeature = gameStateManager.isBuyFeatureSpin;
-
     try {
-      // Step 1: Wait for player to see scatter symbols
-      console.log('[ScatterAnimationManager] Waiting for player to see scatter symbols...');
-      await this.delay(this.getTurboAdjustedDelay(this.config.scatterRevealDelay));
-      
-      // Step 2: Skip all spinner animations; directly determine free spins and show dialog
-      this.determineFreeSpins(data);
-
-      // Align normal scatter with buy-feature flow: ensure symbols are reset/visible
-      // before the free-spin dialog transition completes.
-      try {
-        const gameScene: any = this.scene as any;
-        await gameScene?.symbols?.forceScatterResetImmediate?.();
-        gameScene?.symbols?.ensureScatterSymbolsVisible?.();
-        gameScene?.symbols?.container?.setVisible?.(true);
-        gameScene?.symbols?.container?.setAlpha?.(1);
-      } catch { }
-
-      // Wait for Symbols transition (merge + explosion + overlay) before showing dialog - same for normal and buy feature
-      await this.waitForBuyFeatureTransitions();
-
-      // Directly show free spins dialog without wheel
-      this.showFreeSpinsDialog(data);
-
-      if (isBuyFeature) {
-        try {
-          if (typeof this.dialogsComponent?.hideRadialDimmerTransition === 'function') {
-            this.dialogsComponent.hideRadialDimmerTransition();
-          }
-        } catch {}
-        gameStateManager.isBuyFeatureSpin = false;
-      }
-      
-      // Note: Symbol reset will happen after dialog animations complete
-      console.log('[ScatterAnimationManager] Scatter bonus sequence completed, waiting for dialog animations to finish');
-      
+      await this.runScatterFlow({
+        type: isBuyFeature ? 'buyFeature' : 'trigger',
+        area: data.symbols,
+      });
+      if (isBuyFeature) gameStateManager.isBuyFeatureSpin = false;
     } catch (error) {
-      console.error('[ScatterAnimationManager] Error during scatter animation:', error);
+      console.error('[ScatterAnimationManager] Error during scatter flow:', error);
     } finally {
-      if (isBuyFeature && gameStateManager.isBuyFeatureSpin) {
-        gameStateManager.isBuyFeatureSpin = false;
-      }
+      if (isBuyFeature && gameStateManager.isBuyFeatureSpin) gameStateManager.isBuyFeatureSpin = false;
       this.isAnimating = false;
     }
   }
@@ -189,7 +148,7 @@ export class ScatterAnimationManager {
         const scatterPositions = symbols.grid.findScatterSymbols();
         if (scatterPositions.length) {
           const symbol = symbols.grid.getSymbol(scatterPositions[0].x, scatterPositions[0].y);
-          const anim = symbol?.skeleton?.data?.findAnimation?.('Symbol0_BZ_win') || symbol?.skeleton?.data?.findAnimation?.('Symbol0_PC_win');
+          const anim = symbol?.skeleton?.data?.findAnimation?.('Symbol0_MT_win') || symbol?.skeleton?.data?.findAnimation?.('Symbol0_PC_win');
           if (anim && typeof anim.duration === 'number') {
             return Math.max(300, Math.round(anim.duration * 1000 * 0.7));
           }
@@ -204,28 +163,38 @@ export class ScatterAnimationManager {
 
     this.scene.events.once('dialogFullyDisplayed', (dialogType: string) => {
       if (dialogType !== expectedDialogType) return;
-
-      const symbolsComponent = (this.scene as any)?.symbols;
-      if (symbolsComponent && typeof symbolsComponent.setScatterSymbolsToIdle === 'function') {
-        symbolsComponent.setScatterSymbolsToIdle();
+      const delayMs = this.config.scatterIdleAfterDialogDelayMs ?? 0;
+      const applyIdle = () => {
+        const symbolsComponent = (this.scene as any)?.symbols;
+        if (symbolsComponent?.playScatterIdleAnimation) {
+          symbolsComponent.playScatterIdleAnimation();
+        } else if (symbolsComponent?.setScatterSymbolsToIdle) {
+          symbolsComponent.setScatterSymbolsToIdle();
+        }
+      };
+      if (delayMs > 0) {
+        setTimeout(applyIdle, delayMs);
+      } else {
+        applyIdle();
       }
     });
   }
 
   public async runScatterFlow(options: ScatterFlowOptions): Promise<void> {
-    if (this.isAnimating || !this.scene) {
-      console.warn('[ScatterAnimationManager] runScatterFlow blocked: animation in progress or scene missing');
+    if (!this.scene) {
       return;
     }
-    this.isAnimating = true;
 
     const sceneAny = this.scene as any;
     const symbolsComponent = sceneAny?.symbols;
-    const scatterGrids = this.getScatterGridPositions(options);
+    if (!symbolsComponent?.mergeScatterSymbols || !symbolsComponent?.playScatterWinAnimation) {
+      console.warn('[ScatterAnimationManager] Symbols or scatter methods not available');
+      return;
+    }
 
+    const scatterGrids = this.getScatterGridPositions(options);
     if (!scatterGrids.length) {
       console.warn('[ScatterAnimationManager] No scatter grids found for runScatterFlow');
-      this.isAnimating = false;
       return;
     }
 
@@ -250,39 +219,42 @@ export class ScatterAnimationManager {
         }
       }
 
-      const data = new Data();
-      data.symbols = options.area ?? [];
+      await symbolsComponent.mergeScatterSymbols(scatterGrids);
+      const winDurationMs: number = await symbolsComponent.playScatterWinAnimation(scatterGrids);
 
-      if (symbolsComponent?.mergeScatterSymbols && symbolsComponent?.playScatterWinAnimation) {
-        await symbolsComponent.mergeScatterSymbols(scatterGrids);
-        const winDurationMs: number = await symbolsComponent.playScatterWinAnimation(scatterGrids);
+      let waitedOnAnimation = false;
+      try {
+        if (typeof symbolsComponent.waitForScatterWinLoopComplete === 'function') {
+          waitedOnAnimation = true;
+          await symbolsComponent.waitForScatterWinLoopComplete();
+        }
+      } catch (e) {
+        console.warn('[ScatterAnimationManager] waitForScatterWinLoopComplete failed, falling back to timed delay', e);
+        waitedOnAnimation = false;
+      }
 
-        let holdMs = this.getScatterHoldDuration();
+      if (!waitedOnAnimation) {
+        let holdMs = 800;
         if (winDurationMs && winDurationMs > 0) {
           holdMs = Math.max(600, winDurationMs * 0.7);
         }
         await this.delay(holdMs);
-      } else if (typeof symbolsComponent?.animateScatterSymbols === 'function') {
-        await symbolsComponent.animateScatterSymbols(data, scatterGrids);
-      } else {
-        console.warn('[ScatterAnimationManager] Symbols or scatter methods not available');
-        return;
       }
 
+      const data = new Data();
+      data.symbols = options.area ?? [];
       data.scatterIndex = Math.max(0, scatterGrids.length - 4);
       data.freeSpins = Math.max(0, this.getFreeSpinsFromSpinData());
       gameStateManager.isScatter = true;
       gameStateManager.scatterIndex = data.scatterIndex || 0;
 
-      if (options.type === 'retrigger') {
+      if (options.type === 'retrigger' || options.type === 'symbol0') {
         this.showRetriggerFreeSpinsDialog(options.retriggerSpins ?? 0);
       } else {
         this.showFreeSpinsDialog(data, { suppressBlackOverlay: false });
       }
     } catch (e) {
       console.error('[ScatterAnimationManager] runScatterFlow error:', e);
-    } finally {
-      this.isAnimating = false;
     }
   }
 

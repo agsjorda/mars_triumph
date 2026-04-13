@@ -10,12 +10,12 @@ import { gameStateManager } from '../../managers/GameStateManager';
 import { gameEventManager, GameEventType } from '../../event/EventManager';
 import { UI_CONFIG, WIN_THRESHOLDS, TIMING_CONFIG } from '../../config/GameConfig';
 import { Logger } from '../../utils/Logger';
-import { CurrencyManager } from './CurrencyManager';
 import { localizationManager } from '../../managers/LocalizationManager';
 import { DIALOG_PRESS_CONTINUE, LOCALIZATION_DEFAULTS } from '../../backend/LocalizationData';
+import { getDecimalPlaces } from '../../utils/NumberPrecisionFormatter';
 
 export interface DialogConfig {
-	type: 'Congrats_BZ' | 'FreeSpin_BZ' | 'FreeSpinRetri_BZ' | 'BigW_BZ' | 'MegaW_BZ' | 'EpicW_BZ' | 'SuperW_BZ' | 'TotalW_BZ';
+	type: 'Congrats_BZ' | 'FreeSpin_BZ' | 'FreeSpinRetri_BZ' | 'BigW_MT' | 'MegaW_MT' | 'EpicW_MT' | 'SuperW_MT' | 'TotalW_BZ';
 	position?: { x: number; y: number };
 	scale?: number;
 	// Non-uniform scale/offsets are intended for TotalW_BZ only.
@@ -76,7 +76,7 @@ export class Dialogs {
 	private defaultWinDialogAutoCloseEnabled: boolean = true;
 
 	// Number display Y positions per dialog group (overrides). If null, default will be used.
-	private numberYWin: number | null = 490;
+	private numberYWin: number | null = 650;
 	private numberYFreeSpin: number | null = null;
 	private numberYCongrats: number | null = null;
 
@@ -87,7 +87,7 @@ export class Dialogs {
 
 	// Staged win animation state (Big -> Mega -> Epic -> Super with incremental number steps)
 	private isStagedWinNumberAnimation: boolean = false;
-	private stagedWinStages: Array<{ type: 'BigW_BZ' | 'MegaW_BZ' | 'EpicW_BZ' | 'SuperW_BZ'; target: number }> = [];
+	private stagedWinStages: Array<{ type: 'BigW_MT' | 'MegaW_MT' | 'EpicW_MT' | 'SuperW_MT'; target: number }> = [];
 	private stagedWinCurrentStageIndex: number = 0;
 	private stagedWinStageTimer: Phaser.Time.TimerEvent | null = null;
 
@@ -98,14 +98,14 @@ export class Dialogs {
 
 	// Dialog configuration
 	private dialogScales: Record<string, number> = {
-		'Congrats_BZ': 0.45,
-		'FreeSpin_BZ': 0.45,
-		'FreeSpinRetri_BZ': 0.45,
-		'BigW_BZ': 0.45,
-		'MegaW_BZ': 0.45,
-		'EpicW_BZ': 0.45,
-		'SuperW_BZ': 0.45,
-		'TotalW_BZ': 0.45
+		'Congrats_BZ': 0.55,
+		'FreeSpin_BZ': 0.55,
+		'FreeSpinRetri_BZ': 0.55,
+		'BigW_MT': 0.55,
+		'MegaW_MT': 0.55,
+		'EpicW_MT': 0.55,
+		'SuperW_MT': 0.55,
+		'TotalW_BZ': 0.55
 	};
 
 	// Adjust TotalW_BZ scale
@@ -118,10 +118,10 @@ export class Dialogs {
 		'Congrats_BZ': { x: 0.5, y: 0.4 },
 		'FreeSpin_BZ': { x: 0.5, y: 0.4 },
 		'FreeSpinRetri_BZ': { x: 0.5, y: 0.4 },
-		'BigW_BZ': { x: 0.5, y: 0.4 },
-		'MegaW_BZ': { x: 0.5, y: 0.4 },
-		'EpicW_BZ': { x: 0.5, y: 0.4 },
-		'SuperW_BZ': { x: 0.5, y: 0.4 },
+		'BigW_MT': { x: 0.5, y: 0.4 },
+		'MegaW_MT': { x: 0.5, y: 0.4 },
+		'EpicW_MT': { x: 0.5, y: 0.4 },
+		'SuperW_MT': { x: 0.5, y: 0.4 },
 		'TotalW_BZ': { x: 0.5, y: 0.4 }
 	};
 
@@ -139,16 +139,27 @@ export class Dialogs {
 		'Congrats_BZ': true,
 		'FreeSpin_BZ': true,
 		'FreeSpinRetri_BZ': true,
-		'BigW_BZ': true,
-		'MegaW_BZ': true,
-		'EpicW_BZ': true,
-		'SuperW_BZ': true,
+		'BigW_MT': true,
+		'MegaW_MT': true,
+		'EpicW_MT': true,
+		'SuperW_MT': true,
 		'TotalW_BZ': true
 	};
 
-	// Global toggle to disable intro animations for dialogs (win, free spin, congrats)
-	// When true, dialogs will start directly in their idle loop.
-	private disableIntroAnimations: boolean = true;
+	/**
+	 * One Spine animation name per dialog asset (matches each JSON `animations` key).
+	 * MT win popups export `animation`; BZ dialogs use `{type}_idle`.
+	 */
+	private static readonly DIALOG_SPINE_ANIMATION: Record<string, string> = {
+		Congrats_BZ: 'Congrats_BZ_idle',
+		FreeSpin_BZ: 'FreeSpin_BZ_idle',
+		FreeSpinRetri_BZ: 'FreeSpinRetri_BZ_idle',
+		BigW_MT: 'animation',
+		MegaW_MT: 'animation',
+		EpicW_MT: 'animation',
+		SuperW_MT: 'animation',
+		TotalW_BZ: 'TotalW_BZ_idle',
+	};
 
 	// Remember the intended scale for the current dialog so we can tween from 0 -> target
 	private lastDialogScaleX: number = 1;
@@ -174,7 +185,7 @@ export class Dialogs {
 
 		// Create main dialog overlay container
 		this.dialogOverlay = scene.add.container(0, 0);
-		this.dialogOverlay.setDepth(12000); // Very high depth to cover everything
+		this.dialogOverlay.setDepth(9500); // Very high depth to cover everything
 		this.dialogOverlay.setVisible(false); // Hidden by default
 
 		// Create black overlay background just behind dialog overlay
@@ -452,22 +463,22 @@ export class Dialogs {
 	 */
 	private normalizeDialogType(type: string): DialogConfig['type'] {
 		const normalizedMap: Record<string, DialogConfig['type']> = {
-			SmallW_KA: 'BigW_BZ',
-			MediumW_KA: 'MegaW_BZ',
-			LargeW_KA: 'EpicW_BZ',
-			SuperW_KA: 'SuperW_BZ',
+			SmallW_KA: 'BigW_MT',
+			MediumW_KA: 'MegaW_MT',
+			LargeW_KA: 'EpicW_MT',
+			SuperW_KA: 'SuperW_MT',
 			Congrats_KA: 'Congrats_BZ',
 			FreeSpin_KA: 'FreeSpin_BZ',
-			smallW_KA: 'BigW_BZ',
-			mediumW_KA: 'MegaW_BZ',
-			largeW_KA: 'EpicW_BZ',
-			superW_KA: 'SuperW_BZ',
+			smallW_KA: 'BigW_MT',
+			mediumW_KA: 'MegaW_MT',
+			largeW_KA: 'EpicW_MT',
+			superW_KA: 'SuperW_MT',
 			// Pastry-style / console-friendly aliases → BZ dialog keys
-			BigWin: 'BigW_BZ',
-			MegaWin: 'MegaW_BZ',
-			EpicWin: 'EpicW_BZ',
-			SuperWin: 'SuperW_BZ',
-			MaxWin: 'SuperW_BZ',
+			BigWin: 'BigW_MT',
+			MegaWin: 'MegaW_MT',
+			EpicWin: 'EpicW_MT',
+			SuperWin: 'SuperW_MT',
+			MaxWin: 'SuperW_MT',
 			TotalWin: 'TotalW_BZ',
 			Congrats: 'Congrats_BZ',
 			FreeSpin: 'FreeSpin_BZ',
@@ -477,12 +488,9 @@ export class Dialogs {
 		return normalizedMap[type] || (type as DialogConfig['type']);
 	}
 
-	/**
-	 * Dialog animations only use idle loops from the dialogs folder.
-	 */
-	private getAnimationNameForDialogType(dialogType: string): { intro: string; idle: string; outro?: string } | null {
-		const idleName = `${dialogType}_idle`;
-		return { intro: idleName, idle: idleName };
+	/** Spine clip to play for this dialog type (each asset exposes a single animation). */
+	private getDialogSpineAnimationName(dialogType: string): string {
+		return Dialogs.DIALOG_SPINE_ANIMATION[dialogType] ?? `${dialogType}_idle`;
 	}
 
 	private getOverlayAnimationNameForDialogType(dialogType: string): string | null {
@@ -493,7 +501,7 @@ export class Dialogs {
 	}
 
 	/**
-	 * Create the main dialog content (FreeSpin_BZ, EpicW_BZ, etc.)
+	 * Create the main dialog content (FreeSpin_BZ, EpicW_MT, etc.)
 	 */
 	private createDialogContent(scene: Scene, config: DialogConfig): void {
 		// Clean up existing dialog
@@ -546,6 +554,12 @@ export class Dialogs {
 				atlasKey
 			);
 			this.currentDialogAssetType = config.type;
+			// Reparent immediately so the skeleton is on the dialog overlay depth stack.
+			// If anything throws below, we still destroy this in the catch — otherwise a
+			// spine left on the scene root renders behind the dimmer (only overlay + numbers visible).
+			this.currentDialog.setDepth(103);
+			this.dialogOverlay.add(this.currentDialog);
+
 			this.currentDialog.setOrigin(0.5, 0.5);
 
 			if (isTotalWinDialog) {
@@ -585,33 +599,34 @@ export class Dialogs {
 			// starting scale of 0 and the pop animation can appear to be skipped.
 			this.currentDialog.setScale(scaleX, scaleY);
 
-			// Get animation names based on dialog type (idle only)
 			const shouldLoop = this.getDialogLoop(config.type);
-			const animations = this.getAnimationNameForDialogType(config.type);
-			if (!animations) {
-				console.error(`[Dialogs] No animation mapping found for dialog type: ${config.type}`);
-				return;
-			}
+			const clip = this.getDialogSpineAnimationName(config.type);
 
 			try {
-				console.log(`[Dialogs] Playing idle animation: ${animations.idle}`);
-				this.currentDialog.animationState.setAnimation(0, animations.idle, shouldLoop);
+				console.log(`[Dialogs] Playing dialog animation: ${clip}`);
+				this.currentDialog.animationState.setAnimation(0, clip, shouldLoop);
 				this.applyDialogScalePop(scene);
 			} catch (error) {
-				console.log(`[Dialogs] Idle animation failed, retrying: ${animations.idle}`);
-				this.currentDialog.animationState.setAnimation(0, animations.idle, shouldLoop);
+				console.log(`[Dialogs] Animation failed, retrying: ${clip}`);
+				this.currentDialog.animationState.setAnimation(0, clip, shouldLoop);
 				this.applyDialogScalePop(scene);
 			}
 		} catch (error) {
 			console.error(`[Dialogs] Error creating dialog content: ${config.type}`, error);
 			console.error(`[Dialogs] This might be due to missing assets for ${config.type}`);
+			if (this.currentDialog) {
+				try {
+					this.currentDialog.destroy();
+				} catch {
+					/* no-op */
+				}
+				this.currentDialog = null;
+			}
+			this.currentDialogAssetType = null;
 			return;
 		}
 
-		this.currentDialog.setDepth(103);
-
-		// Add directly to dialog overlay so it shares the same layer as number display
-		this.dialogOverlay.add(this.currentDialog);
+		// Already on dialogOverlay (see above); depth already set.
 		if (isTotalWinDialog) {
 			const overlayAnimation = this.getOverlayAnimationNameForDialogType(config.type);
 			if (overlayAnimation) {
@@ -843,11 +858,9 @@ export class Dialogs {
 			this.numberDisplayContainer = null;
 		}
 
-		// Determine if this is the Congrats dialog showing a total win amount
-		const isTotalWinDialog =
-			(this.currentDialogType === 'Congrats_BZ' || this.currentDialogType === 'TotalW_BZ') &&
-			freeSpins === undefined;
-		const isDemo = (scene as any).gameAPI?.getDemoState();
+		// Resolve decimal places for currency-aligned display.
+		// Free spins remain integer; wins follow the initialized currency precision.
+		const decimalPlaces = freeSpins !== undefined ? 0 : getDecimalPlaces() || 2;
 
 		// Create number display configuration
 		const numberConfig: NumberDisplayConfig = {
@@ -859,10 +872,10 @@ export class Dialogs {
 			scale: 0.3,
 			spacing: 0,
 			alignment: 'center',
-			decimalPlaces: freeSpins !== undefined ? 0 : 3, // No decimals for free spins
+			decimalPlaces, // 0 for free spins, currency-driven for wins
 			showCommas: freeSpins !== undefined ? false : true, // No commas for free spins
-			// For total win dialog use currency code (not symbol) so e.g. Tunisian "." doesn't render as extra dot in NumberDisplay.
-			prefix: isTotalWinDialog ? (isDemo ? '' : (CurrencyManager.getCurrencyCode() ? `${CurrencyManager.getCurrencyCode()} ` : '')) : '',
+			// NumberDisplay only has digit/comma/dot textures — do not prefix currency code or symbol.
+			prefix: '',
 			suffix: '', // No suffix - only display numbers
 			commaYOffset: 12,
 			dotYOffset: 10
@@ -991,7 +1004,7 @@ export class Dialogs {
 	 * Helper: determine if a type is one of the win dialogs.
 	 */
 	private isWinDialogType(type: string): boolean {
-		return type === 'BigW_BZ' || type === 'MegaW_BZ' || type === 'EpicW_BZ' || type === 'SuperW_BZ';
+		return type === 'BigW_MT' || type === 'MegaW_MT' || type === 'EpicW_MT' || type === 'SuperW_MT';
 	}
 
 	private isTotalWinDialogType(type: string): boolean {
@@ -1374,10 +1387,10 @@ export class Dialogs {
 	 * Check if the current dialog is a win dialog
 	 */
 	private isWinDialog(): boolean {
-		return this.currentDialogType === 'BigW_BZ' ||
-			this.currentDialogType === 'MegaW_BZ' ||
-			this.currentDialogType === 'EpicW_BZ' ||
-			this.currentDialogType === 'SuperW_BZ';
+		return this.currentDialogType === 'BigW_MT' ||
+			this.currentDialogType === 'MegaW_MT' ||
+			this.currentDialogType === 'EpicW_MT' ||
+			this.currentDialogType === 'SuperW_MT';
 	}
 
 	private fadeInDialogDimmer(scene: Scene): void {
@@ -1625,33 +1638,6 @@ export class Dialogs {
 	 */
 	private startWinDialogFadeOut(scene: Scene): void {
 		console.log('[Dialogs] Starting win dialog direct fade-out');
-
-		// Check if we should play outro animation before fading out
-		const animations = this.currentDialogType ? this.getAnimationNameForDialogType(this.currentDialogType) : null;
-		const hasOutro = animations && animations.outro;
-
-		if (hasOutro && this.currentDialog && this.currentDialog.animationState) {
-			console.log(`[Dialogs] Playing outro animation: ${animations.outro}`);
-			try {
-				// Play outro animation, then fade out after it completes
-				this.currentDialog.animationState.setAnimation(0, animations.outro!, false);
-
-				// Get animation duration (estimate 1 second if we can't get it)
-				const outroTrack = this.currentDialog.animationState.getCurrent(0);
-				const outroDuration = outroTrack?.animation?.duration ? outroTrack.animation.duration * 1000 : 0;
-
-				// Wait for outro to complete, then start fade-out
-				scene.time.delayedCall(outroDuration, () => {
-					this.performWinDialogFadeOut(scene);
-				});
-				return; // Exit early, fade-out will happen after outro
-			} catch (error) {
-				console.warn(`[Dialogs] Failed to play outro animation, proceeding with fade-out:`, error);
-				// Fall through to normal fade-out
-			}
-		}
-
-		// No outro or outro failed, proceed with normal fade-out
 		this.performWinDialogFadeOut(scene);
 	}
 
@@ -2127,11 +2113,11 @@ export class Dialogs {
 
 	/**
 	 * Configure staged win number and animation thresholds based on bet and total win.
-	 * Example (bet=0.20, win=0.60, final type=SuperW_BZ):
-	 *  - BigW_BZ (BigWin)   -> 0.16 (0.8x)
-	 *  - MegaW_BZ (MegaWin) -> 0.20 (1x)
-	 *  - EpicW_BZ (EpicWin) -> 0.40 (2x)
-	 *  - SuperW_BZ (SuperWin) -> 0.60 (final win)
+	 * Example (bet=0.20, win=0.60, final type=SuperW_MT):
+	 *  - BigW_MT (BigWin)   -> 0.16 (0.8x)
+	 *  - MegaW_MT (MegaWin) -> 0.20 (1x)
+	 *  - EpicW_MT (EpicWin) -> 0.40 (2x)
+	 *  - SuperW_MT (SuperWin) -> 0.60 (final win)
 	 */
 	private setupStagedWinNumberAnimation(config: DialogConfig): void {
 		const winAmount = config.winAmount ?? 0;
@@ -2147,11 +2133,11 @@ export class Dialogs {
 		}
 
 		// Order of tiers and their multiplier thresholds
-		const orderedTypes: Array<'BigW_BZ' | 'MegaW_BZ' | 'EpicW_BZ' | 'SuperW_BZ'> = [
-			'BigW_BZ',
-			'MegaW_BZ',
-			'EpicW_BZ',
-			'SuperW_BZ'
+		const orderedTypes: Array<'BigW_MT' | 'MegaW_MT' | 'EpicW_MT' | 'SuperW_MT'> = [
+			'BigW_MT',
+			'MegaW_MT',
+			'EpicW_MT',
+			'SuperW_MT'
 		];
 		const thresholds = [
 			WIN_THRESHOLDS.BIG_WIN,
@@ -2163,7 +2149,7 @@ export class Dialogs {
 		const finalIndex = orderedTypes.indexOf(config.type as any);
 		if (finalIndex <= 0) {
 			// Only apply staged behavior when final tier is at least Medium (MegaWin) or higher
-			console.log('[Dialogs] Staged win: final tier is BigW_BZ or unknown - using simple animation');
+			console.log('[Dialogs] Staged win: final tier is BigW_MT or unknown - using simple animation');
 			this.isStagedWinNumberAnimation = false;
 			this.stagedWinStages = [];
 			this.stagedWinCurrentStageIndex = 0;
@@ -2171,7 +2157,7 @@ export class Dialogs {
 			return;
 		}
 
-		let stages: Array<{ type: 'BigW_BZ' | 'MegaW_BZ' | 'EpicW_BZ' | 'SuperW_BZ'; target: number }> = [];
+		let stages: Array<{ type: 'BigW_MT' | 'MegaW_MT' | 'EpicW_MT' | 'SuperW_MT'; target: number }> = [];
 		let lastTarget = 0;
 
 		// Add intermediate tiers (below the final tier) only at their threshold values,
@@ -2226,29 +2212,21 @@ export class Dialogs {
 			}
 
 			if (this.currentDialog && this.currentDialog.animationState) {
-				const animations = this.getAnimationNameForDialogType(firstStage.type);
-				if (animations) {
-					const shouldLoop = this.getDialogLoop(firstStage.type);
-					console.log('[Dialogs] Staged win: initializing spine animation to first stage', animations);
-					try {
-						if (this.disableIntroAnimations) {
-							this.currentDialog.animationState.setAnimation(0, animations.idle, shouldLoop);
-						} else {
-							this.currentDialog.animationState.setAnimation(0, animations.intro, false);
-							this.currentDialog.animationState.addAnimation(0, animations.idle, shouldLoop, 0);
-						}
-						// Apply scale pop whenever we transition into idle
-						const sceneRef = this.currentScene;
-						if (sceneRef) {
-							this.applyDialogScalePop(sceneRef);
-						}
-					} catch (err) {
-						console.warn('[Dialogs] Staged win: failed to play intro/idle for first stage, using idle only', err);
-						this.currentDialog.animationState.setAnimation(0, animations.idle, shouldLoop);
-						const sceneRef = this.currentScene;
-						if (sceneRef) {
-							this.applyDialogScalePop(sceneRef);
-						}
+				const clip = this.getDialogSpineAnimationName(firstStage.type);
+				const shouldLoop = this.getDialogLoop(firstStage.type);
+				console.log('[Dialogs] Staged win: initializing spine animation to first stage', clip);
+				try {
+					this.currentDialog.animationState.setAnimation(0, clip, shouldLoop);
+					const sceneRef = this.currentScene;
+					if (sceneRef) {
+						this.applyDialogScalePop(sceneRef);
+					}
+				} catch (err) {
+					console.warn('[Dialogs] Staged win: failed to play animation for first stage', err);
+					this.currentDialog.animationState.setAnimation(0, clip, shouldLoop);
+					const sceneRef = this.currentScene;
+					if (sceneRef) {
+						this.applyDialogScalePop(sceneRef);
 					}
 				}
 			}
@@ -2357,25 +2335,19 @@ export class Dialogs {
 		// so avoid resetting it here to prevent the "first tier plays twice" effect.
 		if (index > 0 || fastFromSkip) {
 			try {
-				const animations = this.getAnimationNameForDialogType(stage.type);
-				if (animations && this.currentDialog.animationState) {
+				const clip = this.getDialogSpineAnimationName(stage.type);
+				if (this.currentDialog.animationState) {
 					const shouldLoop = this.getDialogLoop(stage.type);
-					console.log('[Dialogs] Staged win: switching spine animation to', animations);
+					console.log('[Dialogs] Staged win: switching spine animation to', clip);
 					try {
-						if (this.disableIntroAnimations) {
-							this.currentDialog.animationState.setAnimation(0, animations.idle, shouldLoop);
-						} else {
-							this.currentDialog.animationState.setAnimation(0, animations.intro, false);
-							this.currentDialog.animationState.addAnimation(0, animations.idle, shouldLoop, 0);
-						}
-						// Apply scale pop whenever we transition into idle
+						this.currentDialog.animationState.setAnimation(0, clip, shouldLoop);
 						const sceneRef = this.currentScene || scene;
 						if (sceneRef) {
 							this.applyDialogScalePop(sceneRef);
 						}
 					} catch (err) {
-						console.warn('[Dialogs] Staged win: intro/idle animation failed, using idle only', err);
-						this.currentDialog.animationState.setAnimation(0, animations.idle, shouldLoop);
+						console.warn('[Dialogs] Staged win: animation failed, retrying', err);
+						this.currentDialog.animationState.setAnimation(0, clip, shouldLoop);
 						const sceneRef = this.currentScene || scene;
 						if (sceneRef) {
 							this.applyDialogScalePop(sceneRef);
@@ -2583,19 +2555,19 @@ export class Dialogs {
 	}
 
 	showLargeWin(scene: Scene, config?: Partial<DialogConfig>): void {
-		this.showDialog(scene, { type: 'EpicW_BZ', ...config });
+		this.showDialog(scene, { type: 'EpicW_MT', ...config });
 	}
 
 	showMediumWin(scene: Scene, config?: Partial<DialogConfig>): void {
-		this.showDialog(scene, { type: 'MegaW_BZ', ...config });
+		this.showDialog(scene, { type: 'MegaW_MT', ...config });
 	}
 
 	showSmallWin(scene: Scene, config?: Partial<DialogConfig>): void {
-		this.showDialog(scene, { type: 'BigW_BZ', ...config });
+		this.showDialog(scene, { type: 'BigW_MT', ...config });
 	}
 
 	showSuperWin(scene: Scene, config?: Partial<DialogConfig>): void {
-		this.showDialog(scene, { type: 'SuperW_BZ', ...config });
+		this.showDialog(scene, { type: 'SuperW_MT', ...config });
 	}
 
 	/**

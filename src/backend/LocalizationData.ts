@@ -191,7 +191,7 @@ export const LOCALIZATION_DEFAULTS: Record<string, string> = {
 	[DIALOG_PRESS_CONTINUE]: 'Press anywhere to continue',
 	// Buy Feature
 	[BUY_FEATURE_TITLE]: 'Buy Feature',
-	[BUY_FEATURE_FEATURE_NAME]: 'A Devilish Deal!',
+	[BUY_FEATURE_FEATURE_NAME]: 'Spoils of war!',
 	[BUY_FEATURE_BUY_BUTTON]: 'BUY FEATURE',
 	// Bet Options
 	[BET_OPTIONS_SELECT_SIZE]: 'Select size',

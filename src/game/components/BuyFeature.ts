@@ -362,9 +362,9 @@ export class BuyFeature {
 				// Play continuous "idle" loop (or win loop if requested) for the scatter symbol (BZ assets)
 				try {
 					const symbolValue = 0;
-					const preferredIdle = `Symbol${symbolValue}_BZ_idle`;
+					const preferredIdle = `Symbol${symbolValue}_MT_idle`;
 					const fallbackIdle = `Symbol${symbolValue}_SW_Idle`;
-					const preferredWin = `Symbol${symbolValue}_BZ_win`;
+					const preferredWin = `Symbol${symbolValue}_MT_win`;
 					const fallbackWin = `Symbol${symbolValue}_SW_Win`;
 					const state: any = this.scatterSpine.animationState;
 					const skeleton: any = this.scatterSpine.skeleton;
@@ -817,9 +817,9 @@ export class BuyFeature {
 			!!(skeleton?.data && typeof skeleton.data.findAnimation === 'function' && skeleton.data.findAnimation(name));
 
 		const symbolValue = 0;
-		const preferredWin = `Symbol${symbolValue}_BZ_win`;
+		const preferredWin = `Symbol${symbolValue}_MT_win`;
 		const fallbackWin = `Symbol${symbolValue}_SW_Win`;
-		const preferredIdle = `Symbol${symbolValue}_BZ_idle`;
+		const preferredIdle = `Symbol${symbolValue}_MT_idle`;
 		const fallbackIdle = `Symbol${symbolValue}_SW_Idle`;
 		const winName = hasAnimation(preferredWin)
 			? preferredWin

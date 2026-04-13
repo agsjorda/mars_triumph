@@ -3461,6 +3461,10 @@ export class SlotController {
 			this.disableAmplifyButton();
 			return;
 		}
+		if (gameStateManager.isReelSpinning || gameStateManager.isProcessingSpin) {
+			this.disableAmplifyButton();
+			return;
+		}
 		// Enforce affordability here too, because many flows call enableAmplifyButton()
 		// directly (bypassing updateAmplifyButtonStateWithLock()).
 		try {
@@ -4088,9 +4092,19 @@ export class SlotController {
 				const baseWin = this.getBaseSpinWinForBalance(spinData);
 				if (baseWin > 0) return true;
 			}
+			// Some payloads include a `tumbles` array even when all steps pay 0.
+			// Treat "wins pending" as true only when there is a positive tumble win.
 			const slotTumbles = spinData?.slot?.tumbles;
 			if (Array.isArray(slotTumbles) && slotTumbles.length > 0) {
-				return true;
+				for (const tumble of slotTumbles as any[]) {
+					const w = Number(tumble?.win ?? 0);
+					if (Number.isFinite(w) && w > 0) return true;
+					const outsArr = Array.isArray(tumble?.symbols?.out) ? tumble.symbols.out : [];
+					for (const out of outsArr) {
+						const ow = Number(out?.win ?? 0);
+						if (Number.isFinite(ow) && ow > 0) return true;
+					}
+				}
 			}
 		} catch { }
 		return false;
@@ -5357,6 +5371,12 @@ export class SlotController {
 			(this.autoplayController?.getSpinsRemaining() ?? 0) > 0;
 		// During autoplay, amplify stays non-interactive (like startAutoplay) but must keep enhanced-bet tint — do not call enableAmplifyButton() (it used to clear tint).
 		if (autoplayRunning) {
+			this.initializeAmplifyButtonState();
+			this.disableAmplifyButton();
+			return;
+		}
+
+		if (gameStateManager.isReelSpinning || gameStateManager.isProcessingSpin) {
 			this.initializeAmplifyButtonState();
 			this.disableAmplifyButton();
 			return;

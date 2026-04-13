@@ -1,31 +1,25 @@
 import { Scene } from "phaser";
+import { SpineGameObject } from '@esotericsoftware/spine-phaser-v3';
 import { NetworkManager } from "../../managers/NetworkManager";
 import { ScreenModeManager } from "../../managers/ScreenModeManager";
 import { gameStateManager } from "../../managers/GameStateManager";
-import { ensureSpineFactory } from "../../utils/SpineGuard";
+
 export class Background {
 	private bgContainer!: Phaser.GameObjects.Container;
 	private networkManager: NetworkManager;
 	private screenModeManager: ScreenModeManager;
 	private normalBgCover: Phaser.GameObjects.Image | null = null;
-	private bgDefault: Phaser.GameObjects.Image | null = null;
-	// ADJUST HERE (BG-Default): scale multiplier for the static main background (NormalGame_BG.webp).
-	// The image scales to fit the screen WIDTH (preserving aspect ratio, no cropping).
+	private bgDefault: SpineGameObject | null = null;
+	// ADJUST HERE (BG-Default): scale multiplier for the BG_Overlay_Light_Rays spine animation.
 	private bgDefaultScaleMultiplier: number = 1;
 	// normal-bg-cover (ControllerNormal): size is (height fraction fit) × (scale multipliers).
 	// - coverHeightPercentOfScene: target height as a fraction of scene height (e.g. 0.5 = half screen).
 	// - NORMAL_BG_COVER_SCALE_MULTIPLIER_*: extra multiply on that fit (1 = no change); X/Y can differ (stretch).
 	private coverHeightPercentOfScene: number = 0.5;
 	private readonly NORMAL_BG_COVER_SCALE_MULTIPLIER_X: number = 1;
-	private readonly NORMAL_BG_COVER_SCALE_MULTIPLIER_Y: number = .53;
+	private readonly NORMAL_BG_COVER_SCALE_MULTIPLIER_Y: number = .6;
 	// Vertical nudge for the image bottom edge (positive = down past screen bottom, negative = up).
 	private readonly NORMAL_BG_COVER_OFFSET_Y_PX: number = 0;
-	// Cloud background variables removed
-	private shineInstances: Phaser.GameObjects.Image[] = [];
-	private activeShineCount: number = 0;
-	private readonly MAX_SHINES: number = 5;
-	private shineTimer: Phaser.Time.TimerEvent | null = null;
-
 	constructor(networkManager: NetworkManager, screenModeManager: ScreenModeManager) {
 		this.networkManager = networkManager;
 		this.screenModeManager = screenModeManager;
@@ -46,8 +40,7 @@ export class Background {
 
 		console.log(`[Background] Creating background with scale: ${assetScale}x`);
 
-		// Add background layers
-		this.createBackgroundLayers(scene, assetScale);
+		this.createBackgroundLayers(scene);
 		this.layout(scene);
 
 		// Add decorative elements
@@ -60,14 +53,22 @@ export class Background {
 		this.setupBonusModeListener(scene);
 	}
 
-	private createBackgroundLayers(scene: Scene, assetScale: number): void {
-		// BG-Default: full-scene background image
-		this.bgDefault = scene.add.image(
-			scene.scale.width * 0.5,
-			scene.scale.height * 0.5,
-			'BG-Default'
-		).setOrigin(0.5, 0.5);
-		this.bgContainer.add(this.bgDefault);
+	private createBackgroundLayers(scene: Scene): void {
+		// BG-Default: full-scene background spine animation
+		try {
+			this.bgDefault = (scene.add as any).spine(
+				scene.scale.width * 0.5,
+				scene.scale.height * 0.5,
+				'BG_Overlay_Light_Rays',
+				'BG_Overlay_Light_Rays-atlas'
+			) as SpineGameObject;
+			this.bgDefault.setOrigin(0.5, 0.5);
+			this.bgDefault.animationState.setAnimation(0, 'animation', true);
+			this.bgContainer.add(this.bgDefault);
+		} catch (e) {
+			console.warn('[Background] Failed to create BG_Overlay_Light_Rays spine:', e);
+			this.bgDefault = null;
+		}
 
 		// normal-bg-cover: foreground overlay (controller area). Keep it out of the container
 		// so its depth can reliably sit above symbols/winlines if needed.
@@ -77,9 +78,6 @@ export class Background {
 			scene.scale.height,
 			'normal-bg-cover'
 		).setOrigin(0.5, 1).setDepth(850);
-
-		// Add shine effect (if needed)
-		this.createShineEffect(scene, assetScale);
 	}
 
 	// adjustments for the background layout
@@ -89,14 +87,9 @@ export class Background {
 
 		if (this.bgDefault) {
 			this.bgDefault.setPosition(width * 0.5, height * 0.5);
-			// ADJUST HERE (BG-Default): fit to width with aspect ratio preserved.
-			// Change `bgDefaultScaleMultiplier` above to adjust the scale (0.95 = 95% of screen width).
-			const sourceWidth = this.bgDefault.width;
-			if (sourceWidth > 0) {
-				const multiplier = Phaser.Math.Clamp(this.bgDefaultScaleMultiplier, 0.1, 5);
-				const targetScale = (width / sourceWidth) * multiplier;
-				this.bgDefault.setScale(targetScale);
-			}
+			// ADJUST HERE (BG-Default): scale multiplier for the BG_Overlay_Light_Rays spine.
+			const multiplier = Phaser.Math.Clamp(this.bgDefaultScaleMultiplier, 0.1, 5);
+			this.bgDefault.setScale(multiplier);
 		}
 
 		if (this.normalBgCover) {
@@ -116,98 +109,6 @@ export class Background {
 
 	}
 
-	// Shine effect creation
-	private createShineEffect(scene: Scene, assetScale: number): void {
-		// Create pool of shine images (max 5)
-		for (let i = 0; i < this.MAX_SHINES; i++) {
-			const shine = scene.add.image(0, 0, 'shine')
-				.setOrigin(0.5, 0.5)
-				.setScale(0)
-				.setAlpha(1)
-				.setDepth(3) // Above clouds but below UI elements
-				.setVisible(false);
-			this.shineInstances.push(shine);
-		}
-
-		// Start the random shine animation cycle
-		this.scheduleNextShine(scene, assetScale);
-	}
-
-	private scheduleNextShine(scene: Scene, assetScale: number): void {
-		// Random delay between 2-5 seconds before next shine appears
-		const delay = Phaser.Math.Between(400, 700);
-
-		this.shineTimer = scene.time.delayedCall(delay, () => {
-			// Only create new shine if we haven't reached the max
-			if (this.activeShineCount < this.MAX_SHINES) {
-				this.playShineAnimation(scene, assetScale);
-			}
-			// Always schedule the next attempt
-			this.scheduleNextShine(scene, assetScale);
-		});
-	}
-
-	private playShineAnimation(scene: Scene, assetScale: number): void {
-		// Find an available shine instance
-		const shine = this.shineInstances.find(s => !s.visible);
-		if (!shine) return; // All shines are active
-
-		// Increment active count
-		this.activeShineCount++;
-
-		// Define the area where shine can appear (from top until 1/4 of the screen)
-		// Adjust these values to control the range
-		const minX = scene.scale.width * 0;
-		const maxX = scene.scale.width * 1;
-		const minY = scene.scale.height * 0;
-		const maxY = scene.scale.height * 0.25;
-
-		// Random position within the defined area
-		const randomX = Phaser.Math.Between(minX, maxX);
-		const randomY = Phaser.Math.Between(minY, maxY);
-
-		// Set position and initial state
-		shine.setPosition(randomX, randomY);
-		shine.setScale(0);
-		shine.setAlpha(1);
-		shine.setVisible(true);
-
-		// Scale up animation
-		const scaleUpDuration = 400;
-		const scaleDownDuration = 400;
-		const holdDuration = 200;
-		const maxScale = assetScale * Phaser.Math.FloatBetween(0.8, 1.2); // Random scale variation
-
-		scene.tweens.add({
-			targets: shine,
-			scale: maxScale,
-			duration: scaleUpDuration,
-			ease: 'Sine.easeOut',
-			onComplete: () => {
-				// Hold at max scale briefly
-				scene.time.delayedCall(holdDuration, () => {
-					if (shine && shine.visible) {
-						// Scale down animation
-						scene.tweens.add({
-							targets: shine,
-							scale: 0,
-							duration: scaleDownDuration,
-							ease: 'Sine.easeIn',
-							onComplete: () => {
-								if (shine) {
-									shine.setVisible(false);
-								}
-								// Decrement active count
-								this.activeShineCount = Math.max(0, this.activeShineCount - 1);
-							}
-						});
-					}
-				});
-			}
-		});
-	}
-
-
 	resize(scene: Scene): void {
 		if (this.bgContainer) {
 			this.bgContainer.setSize(scene.scale.width, scene.scale.height);
@@ -220,24 +121,6 @@ export class Background {
 	}
 
 	/**
-	 * Clean up shine effect when component is destroyed
-	 */
-	destroy(): void {
-		if (this.shineTimer) {
-			this.shineTimer.destroy();
-			this.shineTimer = null;
-		}
-		// Destroy all shine instances
-		this.shineInstances.forEach(shine => {
-			if (shine) {
-				shine.destroy();
-			}
-		});
-		this.shineInstances = [];
-		this.activeShineCount = 0;
-	}
-
-	/**
 	 * Setup listener for bonus mode changes to toggle cover visibility
 	 */
 	private setupBonusModeListener(scene: Scene): void {
@@ -245,7 +128,7 @@ export class Background {
 		scene.events.on('setBonusMode', (isBonus: boolean) => {
 			if (this.bgDefault) {
 				this.bgDefault.setVisible(!isBonus);
-				console.log(`[Background] BG-Default (NormalGame_BG) visibility set to: ${!isBonus} (isBonus: ${isBonus})`);
+				console.log(`[Background] BG-Default (BG_Overlay_Light_Rays) visibility set to: ${!isBonus} (isBonus: ${isBonus})`);
 			}
 
 			if (this.normalBgCover) {
@@ -260,7 +143,7 @@ export class Background {
 		const isBonus = gameStateManager.isBonus;
 		if (this.bgDefault) {
 			this.bgDefault.setVisible(!isBonus);
-			console.log(`[Background] Initial BG-Default visibility: ${!isBonus} (isBonus: ${isBonus})`);
+			console.log(`[Background] Initial BG_Overlay_Light_Rays visibility: ${!isBonus} (isBonus: ${isBonus})`);
 		}
 		if (this.normalBgCover) {
 			this.normalBgCover.setVisible(!isBonus);

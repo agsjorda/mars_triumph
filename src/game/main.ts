@@ -316,7 +316,7 @@ const StartGame = (parent: string) => {
 	}
 
 	(window as any).phaserGame = game;
-	/** Dev console: open a dialog. Uses mars_triumph BZ types, or pastry-style aliases (e.g. BigWin → BigW_BZ). Example: showDialog({ type: 'BigWin', winAmount: 50000 }) */
+	/** Dev console: open a dialog. Uses mars_triumph BZ types, or pastry-style aliases (e.g. BigWin → BigW_MT). Example: showDialog({ type: 'BigWin', winAmount: 50000 }) */
 	(window as any).showDialog = (params: {
 		type: string;
 		winAmount?: number;

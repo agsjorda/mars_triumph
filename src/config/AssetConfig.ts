@@ -32,12 +32,14 @@ export class AssetConfig {
 
 		return {
 			images: {
-				'BG-Default': `${prefix}/background/NormalGame_BG.webp`,
 				'normal-bg-cover': `assets/portrait/high/background/ControllerNormal.webp`,
-				'shine': `assets/portrait/high/background/shine.png`,
 				'dijoker_loading': `${prefix}/dijoker_loading/DI JOKER.png`
 			},
 			spine: {
+				'BG_Overlay_Light_Rays': {
+					atlas: `${prefix}/background/BG_Overlay_Light_Rays.atlas`,
+					json: `${prefix}/background/BG_Overlay_Light_Rays.json`
+				},
 				'di_joker': {
 					atlas: `${prefix}/dijoker_loading/DI JOKER.atlas`,
 					json: `${prefix}/dijoker_loading/DI JOKER.json`
@@ -119,21 +121,33 @@ export class AssetConfig {
 	// Add more asset groups as needed
 	getSymbolAssets(): AssetGroup {
 		const prefix = this.getAssetPrefix(); // This gives us assets/{orientation}/{quality}
-		const suffix = 'BZ'
+		const suffix = 'MT';
 		console.log(`[AssetConfig] Loading symbol assets from: ${prefix}/symbols/`);
 
 		// Generate symbol assets for all symbols (0-10)
 		const symbolImages: { [key: string]: string } = {};
 		const symbolSpine: { [key: string]: { atlas: string; json: string } } = {};
 
-		// BZ symbol Spine animations for Symbol0–Symbol10 (portrait/high bundle)
+		// Symbol Spine animations for Symbol0–Symbol9 (portrait/high bundle).
 		const bzSymbolRoot = 'assets/portrait/high/symbols';
-		for (let i = 0; i <= 10; i++) {
-			const spineKey = `symbol_${i}_sugar_spine`;
+		for (let i = 0; i <= 9; i++) {
+			const spineKey = `symbol_${i}_spine`;
+			const sugarAliasKey = `symbol_${i}_sugar_spine`;
 			const atlas = `${bzSymbolRoot}/Symbol${i}_${suffix}.atlas`;
 			const json = `${bzSymbolRoot}/Symbol${i}_${suffix}.json`;
 			symbolSpine[spineKey] = { atlas: atlas, json: json };
+			symbolSpine[sugarAliasKey] = { atlas: atlas, json: json };
 		}
+
+		// Multiplier symbol still uses the existing BZ spine files.
+		symbolSpine['symbol_10_spine'] = {
+			atlas: `${bzSymbolRoot}/Symbol10_BZ.atlas`,
+			json: `${bzSymbolRoot}/Symbol10_BZ.json`
+		};
+		symbolSpine['symbol_10_sugar_spine'] = {
+			atlas: `${bzSymbolRoot}/Symbol10_BZ.atlas`,
+			json: `${bzSymbolRoot}/Symbol10_BZ.json`
+		};
 
 		// symbols for helper
 		for (let i = 0; i <= 9; i++) {
@@ -173,12 +187,12 @@ export class AssetConfig {
 			console.log(`[AssetConfig] Multiplier overlay ${value}: ${path}`);
 		});
 		
-		// Symbol removal explosion VFX
-		symbolSpine['Explosion_BZ_VFX'] = {
-			atlas: `${bzSymbolRoot}/Explosion_BZ_VFX.atlas`,
-			json: `${bzSymbolRoot}/Explosion_BZ_VFX.json`
+		// Symbol removal / tumble VFX (smoke)
+		symbolSpine['Smoke_VFX_MT'] = {
+			atlas: `${prefix}/vfx/Smoke_VFX_MT.atlas`,
+			json: `${prefix}/vfx/Smoke_VFX_MT.json`
 		};
-		console.log('[AssetConfig] Explosion VFX spine: Explosion_BZ_VFX');
+		console.log('[AssetConfig] Smoke VFX spine: Smoke_VFX_MT');
 
 		return {
 			images: symbolImages,
@@ -330,21 +344,21 @@ export class AssetConfig {
 					atlas: `${prefix}/dialogs/Congrats_BZ.atlas`,
 					json: `${prefix}/dialogs/Congrats_BZ.json`
 				},
-				'BigW_BZ': {
-					atlas: `${prefix}/dialogs/BigW_BZ.atlas`,
-					json: `${prefix}/dialogs/BigW_BZ.json`
+				'BigW_MT': {
+					atlas: `${prefix}/dialogs/BigW_MT.atlas`,
+					json: `${prefix}/dialogs/BigW_MT.json`
 				},
-				'MegaW_BZ': {
-					atlas: `${prefix}/dialogs/MegaW_BZ.atlas`,
-					json: `${prefix}/dialogs/MegaW_BZ.json`
+				'MegaW_MT': {
+					atlas: `${prefix}/dialogs/MegaW_MT.atlas`,
+					json: `${prefix}/dialogs/MegaW_MT.json`
 				},
-				'EpicW_BZ': {
-					atlas: `${prefix}/dialogs/EpicW_BZ.atlas`,
-					json: `${prefix}/dialogs/EpicW_BZ.json`
+				'EpicW_MT': {
+					atlas: `${prefix}/dialogs/EpicW_MT.atlas`,
+					json: `${prefix}/dialogs/EpicW_MT.json`
 				},
-				'SuperW_BZ': {
-					atlas: `${prefix}/dialogs/SuperW_BZ.atlas`,
-					json: `${prefix}/dialogs/SuperW_BZ.json`
+				'SuperW_MT': {
+					atlas: `${prefix}/dialogs/SuperW_MT.atlas`,
+					json: `${prefix}/dialogs/SuperW_MT.json`
 				},
 				'TotalW_BZ': {
 					atlas: `${prefix}/dialogs/TotalW_BZ.atlas`,
@@ -434,42 +448,42 @@ export class AssetConfig {
 		console.log(`[AssetConfig] Loading audio assets`);
 
 		return {
-			audio: {
-				// Menu/UI clicks
-				'click': 'assets/sounds/SFX/click_1.ogg',
-				//BG sounds
-				'mainbg': 'assets/sounds/BG/normalbg_MT.ogg',
-				'bonusbg': 'assets/sounds/BG/bonusbg_MT.ogg',
-				'freespinbg': 'assets/sounds/BG/freespinbg_MT.ogg',
-				'spinb': 'assets/sounds/SFX/spin_MT.ogg',
-				'reeldrop': 'assets/sounds/SFX/reeldrop_MT.ogg',
-				'scatterdrop1': 'assets/sounds/SFX/symbol_win/scatter_drop_1.ogg',
-				'scatterdrop2': 'assets/sounds/SFX/symbol_win/scatter_drop_2.ogg',
-				'scatterdrop3': 'assets/sounds/SFX/symbol_win/scatter_drop_3.ogg',
-				'scatterdrop4': 'assets/sounds/SFX/symbol_win/scatter_drop_4.ogg',
-				'turbodrop': 'assets/sounds/SFX/turbodrop_MT.ogg',
-				// Scatter win SFX (paper_roll) – played when scatter win animation runs
-				'paper_roll': 'assets/sounds/SFX/paper_roll_BB.ogg',
-				// Multiplier trigger / bomb SFX (bonus-mode multipliers)
-				'bomb': 'assets/sounds/SFX/tbomb_MT.ogg',
-				'tbomb': 'assets/sounds/SFX/tbomb_MT.ogg',
-				// Radial light transition whistle SFX
-				'whistle': 'assets/sounds/SFX/whistle_BB.ogg',
-				'scatter': 'assets/sounds/SFX/scatter_BB.ogg',
-				// Tumble symbol-win SFX (play per tumble index)
-				'hitwin1': 'assets/sounds/SFX/symbol_win/hitwin_1_MT.ogg',
-				'hitwin2': 'assets/sounds/SFX/symbol_win/hitwin_2_MT.ogg',
-				'hitwin3': 'assets/sounds/SFX/symbol_win/twin3_BB.ogg',
-				'hitwin4': 'assets/sounds/SFX/symbol_win/twin4_BB.ogg',
-				// Win dialog SFX
-				'bigw': 'assets/sounds/Wins/bigw_MT.ogg',
-				'megaw': 'assets/sounds/Wins/megaw_MT.ogg',
-				'superw': 'assets/sounds/Wins/superw_MT.ogg',
-				'epicw': 'assets/sounds/Wins/epicw_MT.ogg',
-				'congrats': 'assets/sounds/Wins/totalw_MT.ogg',
-				'maxw': 'assets/sounds/Wins/maxw_MT.ogg'
-			}
-		};
+      audio: {
+        // Menu/UI clicks
+        click: "assets/sounds/SFX/click_1.ogg",
+        //BG sounds
+        mainbg: "assets/sounds/BG/normalbg_MT.ogg",
+        bonusbg: "assets/sounds/BG/bonusbg_MT.ogg",
+        freespinbg: "assets/sounds/BG/freespinbg_MT.ogg",
+        spinb: "assets/sounds/SFX/spin_MT.ogg",
+        reeldrop: "assets/sounds/SFX/reeldrop_MT.ogg",
+        scatterdrop1: "assets/sounds/SFX/symbol_win/scatter_drop_1.ogg",
+        scatterdrop2: "assets/sounds/SFX/symbol_win/scatter_drop_2.ogg",
+        scatterdrop3: "assets/sounds/SFX/symbol_win/scatter_drop_3.ogg",
+        scatterdrop4: "assets/sounds/SFX/symbol_win/scatter_drop_4.ogg",
+        turbodrop: "assets/sounds/SFX/turbodrop_MT.ogg",
+        // Scatter win SFX (paper_roll) – played when scatter win animation runs
+        paper_roll: "assets/sounds/SFX/paper_roll_BB.ogg",
+        // Multiplier trigger / bomb SFX (bonus-mode multipliers)
+        bomb: "assets/sounds/SFX/tbomb_MT.ogg",
+        tbomb: "assets/sounds/SFX/tbomb_MT.ogg",
+        // Radial light transition whistle SFX
+        whistle: "assets/sounds/SFX/whistle_BB.ogg",
+        scatter: "assets/sounds/SFX/scatter_BB.ogg",
+        // Tumble symbol-win SFX (play per tumble index)
+        hitwin1: "assets/sounds/SFX/symbol_win/hitwin_1_MT.ogg",
+        hitwin2: "assets/sounds/SFX/symbol_win/hitwin_2_MT.ogg",
+        hitwin3: "assets/sounds/SFX/symbol_win/hitwin_1_MT.ogg",
+        hitwin4: "assets/sounds/SFX/symbol_win/hitwin_2_MT.ogg",
+        // Win dialog SFX
+        bigw: "assets/sounds/Wins/bigw_MT.ogg",
+        megaw: "assets/sounds/Wins/megaw_MT.ogg",
+        superw: "assets/sounds/Wins/superw_MT.ogg",
+        epicw: "assets/sounds/Wins/epicw_MT.ogg",
+        congrats: "assets/sounds/Wins/totalw_MT.ogg",
+        maxw: "assets/sounds/Wins/maxw_MT.ogg",
+      },
+    };
 	}
 
 	// Helper method to get all assets for a scene
