@@ -872,20 +872,25 @@ export class AudioManager {
 		switch (t) {
 			case 'bigw':
 			case 'bigw_mt':
+			case 'bigwin':
 				effect = SoundEffectType.BIG_WIN; break;
 			case 'megaw':
 			case 'megaw_mt':
+			case 'megawin':
 				effect = SoundEffectType.MEGA_WIN; break;
 			case 'superw':
 			case 'superw_mt':
+			case 'superwin':
 				effect = SoundEffectType.SUPER_WIN; break;
 			case 'epicw':
 			case 'epicw_mt':
+			case 'epicwin':
 				effect = SoundEffectType.EPIC_WIN; break;
 			case 'maxw_bz':
 			case 'maxw':
 				effect = SoundEffectType.MAX_WIN; break;
 			case 'totalw':
+			case 'totalwin':
 				effect = SoundEffectType.DIALOG_CONGRATS; break;
 			default:
 				break;

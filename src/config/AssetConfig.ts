@@ -29,6 +29,7 @@ export class AssetConfig {
 
 	getBackgroundAssets(): AssetGroup {
 		const prefix = this.getAssetPrefix();
+		const bgOverlayLightRaysBase = `${prefix}/background/BG_Overlay_Light_Rays`;
 
 		return {
 			images: {
@@ -37,8 +38,8 @@ export class AssetConfig {
 			},
 			spine: {
 				'BG_Overlay_Light_Rays': {
-					atlas: `${prefix}/background/BG_Overlay_Light_Rays.atlas`,
-					json: `${prefix}/background/BG_Overlay_Light_Rays.json`
+					atlas: `${bgOverlayLightRaysBase}.atlas`,
+					json: `${bgOverlayLightRaysBase}.json`
 				},
 				'di_joker': {
 					atlas: `${prefix}/dijoker_loading/DI JOKER.atlas`,
@@ -340,42 +341,33 @@ export class AssetConfig {
 
 		return {
 			spine: {
-				'Congrats_BZ': {
-					atlas: `${prefix}/dialogs/Congrats_BZ.atlas`,
-					json: `${prefix}/dialogs/Congrats_BZ.json`
+				'Congrats': {
+					atlas: `${prefix}/dialogs/Congrats_MT.atlas`,
+					json: `${prefix}/dialogs/Congrats_MT.json`
 				},
-				'BigW_MT': {
+				'BigWin': {
 					atlas: `${prefix}/dialogs/BigW_MT.atlas`,
 					json: `${prefix}/dialogs/BigW_MT.json`
 				},
-				'MegaW_MT': {
+				'MegaWin': {
 					atlas: `${prefix}/dialogs/MegaW_MT.atlas`,
 					json: `${prefix}/dialogs/MegaW_MT.json`
 				},
-				'EpicW_MT': {
+				'EpicWin': {
 					atlas: `${prefix}/dialogs/EpicW_MT.atlas`,
 					json: `${prefix}/dialogs/EpicW_MT.json`
 				},
-				'SuperW_MT': {
+				'SuperWin': {
 					atlas: `${prefix}/dialogs/SuperW_MT.atlas`,
 					json: `${prefix}/dialogs/SuperW_MT.json`
 				},
-				'TotalW_BZ': {
-					atlas: `${prefix}/dialogs/TotalW_BZ.atlas`,
-					json: `${prefix}/dialogs/TotalW_BZ.json`
+				'TotalWin': {
+					atlas: `${prefix}/dialogs/TotalW_MT.atlas`,
+					json: `${prefix}/dialogs/TotalW_MT.json`
 				},
-				// Total win overlay notes animation (uses TotalW_BZ atlas pages)
-				'TotalW_BZ_meow': {
-					atlas: `${prefix}/dialogs/TotalW_BZ.atlas`,
-					json: `${prefix}/dialogs/cats meow.json`
-				},
-				'FreeSpin_BZ': {
-					atlas: `${prefix}/dialogs/FreeSpin_BZ.atlas`,
-					json: `${prefix}/dialogs/FreeSpin_BZ.json`
-				},
-				'FreeSpinRetri_BZ': {
-					atlas: `${prefix}/dialogs/FreeSpinRetri_BZ.atlas`,
-					json: `${prefix}/dialogs/FreeSpinRetri_BZ.json`
+				'FreeSpin': {
+					atlas: `${prefix}/dialogs/FreeSpin_MT.atlas`,
+					json: `${prefix}/dialogs/FreeSpin_MT.json`
 				}
 			}
 		};

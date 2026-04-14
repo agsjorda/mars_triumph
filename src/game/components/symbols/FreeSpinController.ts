@@ -843,7 +843,7 @@ export class FreeSpinController {
       if (settled) return;
 
       const type = String(dialogType || '');
-			const isWinDialog = ['BigW_MT', 'MegaW_MT', 'EpicW_MT', 'SuperW_MT'].includes(type);
+			const isWinDialog = ['BigWin', 'MegaWin', 'EpicWin', 'SuperWin'].includes(type);
 
       if (!isWinDialog) return;
 

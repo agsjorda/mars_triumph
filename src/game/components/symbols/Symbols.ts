@@ -360,7 +360,7 @@ export class Symbols {
 
     // WIN_STOP - handle Symbol0 and scatter retriggers
     // Defer by 150ms so win dialogs, explosions, and BONUS_TOTAL_WIN_SHOWN run first.
-    // Flow during bonus: win → explosion → win dialogs → Symbol0/scatter win anims → FreeSpinRetri_BZ → continue
+    // Flow during bonus: win → explosion → win dialogs → Symbol0/scatter win anims → FreeSpin (retrigger) → continue
     gameEventManager.on(GameEventType.WIN_STOP, () => {
       if (this.hasPendingSymbol0Retrigger()) {
         this.scene.time.delayedCall(150, () => void this.handleWinStopSymbol0Retrigger());
@@ -1117,7 +1117,7 @@ export class Symbols {
 
   public startScatterAnimationSequence(mockData: any, scatterGrids: GridPosition[]): void {
     console.log('[Symbols] Starting scatter animation sequence');
-    // Cache total win from the trigger spin data so TotalW_BZ uses the buy-feature freeSpin data
+    // Cache total win from the trigger spin data so TotalWin uses the buy-feature freeSpin data
     if (this.cachedTotalWin <= 0) {
       this.cachedTotalWin = this.calculateTotalWinFromSpinData();
       console.log(`[Symbols] Cached total win before freespin dialog: ${this.cachedTotalWin}`);
@@ -2061,7 +2061,7 @@ export class Symbols {
     } else if (this.cachedTotalWin > 0) {
       totalWin = this.cachedTotalWin;
       this.cachedTotalWin = 0;
-      console.log(`[Symbols] Using cached total win for TotalW_BZ: ${totalWin}`);
+      console.log(`[Symbols] Using cached total win for TotalWin: ${totalWin}`);
     } else {
       let spinDataTotal = 0;
       try {

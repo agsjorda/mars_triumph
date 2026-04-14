@@ -112,7 +112,7 @@ export class SlotController {
 	private balanceApiCalledThisSpin: boolean = false;
 	private pendingSpinUntilBalanceReady: boolean = false;
 	
-	// Flag to track if we're in buy feature free spins and waiting for TotalW_BZ dialog
+	// Flag to track if we're in buy feature free spins and waiting for TotalWin dialog
 	private isBuyFeatureFreeSpinsActive: boolean = false;
 	
 	private buyFeatureController!: BuyFeatureController;
@@ -159,9 +159,9 @@ export class SlotController {
 	private isSpinLocked: boolean = false;
 	// Prevent re-enabling spin while win animations are pending
 	private pendingWinLock: boolean = false;
-	// Guard so bonus total is credited once when TotalW_BZ appears
+	// Guard so bonus total is credited once when TotalWin appears
 	private hasFinalizedBonusBalanceForCurrentRound: boolean = false;
-	// Set when TotalW_BZ is shown; consumed when that dialog fully closes.
+	// Set when TotalWin is shown; consumed when that dialog fully closes.
 	private pendingTotalWinBalanceFinalize: boolean = false;
 
 	// Debug: visualize button hitboxes (red outlines)
@@ -705,7 +705,7 @@ export class SlotController {
 		// Setup spin state change listener
 		this.setupSpinStateListener();
 		
-		// Setup dialog shown listener for TotalW_BZ dialog
+		// Setup dialog shown listener for TotalWin dialog
 		this.setupDialogShownListener();
 		
 		// No need to set initial spin button state here - will be handled when reels finish
@@ -2720,7 +2720,7 @@ export class SlotController {
 			// Workaround: prefer balance from spin payload over polling the balance API.
 			if (!gameStateManager.isScatter && !gameStateManager.isBonus) {
 				if (this.shouldDeferBalanceSyncToTotalWinDialog()) {
-					console.log('[SlotController] Skipping REELS_STOP balance sync (buy feature/TotalW_BZ flow active)');
+					console.log('[SlotController] Skipping REELS_STOP balance sync (buy feature/TotalWin flow active)');
 				} else if (this.balanceController?.hasPendingBalanceUpdate()) {
 					console.log('[SlotController] Deferring REELS_STOP balance update (pending winnings will apply on WIN_STOP)');
 				} else if (!this.balanceApiCalledThisSpin) {
@@ -3081,7 +3081,7 @@ export class SlotController {
 			// Finalize base-spin balance only after WIN_STOP (post-tumbles).
 			if (!gameStateManager.isScatter && !gameStateManager.isBonus) {
 				if (this.shouldDeferBalanceSyncToTotalWinDialog()) {
-					console.log('[SlotController] Skipping WIN_STOP base balance finalization (buy feature/TotalW_BZ flow active)');
+					console.log('[SlotController] Skipping WIN_STOP base balance finalization (buy feature/TotalWin flow active)');
 				} else if (this.balanceController?.hasPendingBalanceUpdate()) {
 					// Apply the queued local balance update first so UI reflects the win immediately.
 					this.balanceController.applyPendingBalanceUpdateIfAny();
@@ -4111,7 +4111,7 @@ export class SlotController {
 	}
 
 	/**
-	 * During buy-feature free spins, balance must only be finalized on TotalW_BZ close.
+	 * During buy-feature free spins, balance must only be finalized on TotalWin close.
 	 * This blocks intermediate REELS_STOP/WIN_STOP balance syncs.
 	 */
 	private shouldDeferBalanceSyncToTotalWinDialog(): boolean {
@@ -4130,7 +4130,7 @@ export class SlotController {
 			const fs = slotAny?.freespin || slotAny?.freeSpin;
 			const fsCount = Number(fs?.count ?? 0);
 			const hasFreeSpinItems = Array.isArray(fs?.items) && fs.items.length > 0;
-			// If this spin carries free-spin payload, defer all win credit to TotalW_BZ.
+			// If this spin carries free-spin payload, defer all win credit to TotalWin.
 			if (hasFreeSpinItems || (Number.isFinite(fsCount) && fsCount > 0) || SpinDataUtils.hasFreeSpins(spinData)) {
 				return 0;
 			}
@@ -4459,13 +4459,13 @@ export class SlotController {
 				// If buy feature spin lock is active, mark that we're in buy feature free spins
 				if (this.buyFeatureController.isSpinLocked()) {
 					this.isBuyFeatureFreeSpinsActive = true;
-					console.log('[SlotController] Buy feature free spins activated - buttons will remain disabled until TotalW_BZ dialog');
+					console.log('[SlotController] Buy feature free spins activated - buttons will remain disabled until TotalWin dialog');
 				}
 			} else {
 				const deferPrimaryForExitTransition = gameStateManager.isBonusExitTransitionActive;
 				if (!deferPrimaryForExitTransition) {
 					console.log('[SlotController] Bonus mode deactivated - showing primary controller');
-					// Do not clear TotalW_BZ finalization flags here.
+					// Do not clear TotalWin finalization flags here.
 					// For end-of-free-spin flow, Dialogs emits setBonusMode(false) before
 					// dialogAnimationsComplete, and clearing these flags here can skip
 					// the final bonus credit to balance.
@@ -4639,7 +4639,7 @@ export class SlotController {
 			console.log('[SlotController] Current pendingFreeSpinsData:', this.pendingFreeSpinsData);
 			const isFake = !!this.gameAPI?.isFakeDataEnabled?.();
 
-			// Finalize bonus balance only after TotalW_BZ has been closed by the player.
+			// Finalize bonus balance only after TotalWin has been closed by the player.
 			if (this.pendingTotalWinBalanceFinalize) {
 				this.pendingTotalWinBalanceFinalize = false;
 				this.finalizeBonusBalanceAfterTotalWinDialog();
@@ -4978,7 +4978,7 @@ export class SlotController {
 	}
 
 	/**
-	 * Setup listener for dialog shown events to detect when TotalW_BZ dialog appears
+	 * Setup listener for dialog shown events to detect when TotalWin dialog appears
 	 */
 	private setupDialogShownListener(): void {
 		if (!this.scene) {
@@ -4988,34 +4988,34 @@ export class SlotController {
 
 		this.scene.events.on('dialogShown', (dialogType: string) => {
 			console.log(`[SlotController] Dialog shown: ${dialogType}, isBuyFeatureFreeSpinsActive: ${this.isBuyFeatureFreeSpinsActive}`);
-			if (dialogType === 'TotalW_BZ') {
+			if (dialogType === 'TotalWin') {
 				this.pendingTotalWinBalanceFinalize = true;
 			}
 			
-			// If the TotalW_BZ dialog is shown at the end of bonus, release buy-feature locks
+			// If the TotalWin dialog is shown at the end of bonus, release buy-feature locks
 			// and re-evaluate control states so buttons are not left disabled.
-			if (dialogType === 'TotalW_BZ' && (this.isBuyFeatureFreeSpinsActive || this.buyFeatureController?.isSpinLocked?.())) {
+			if (dialogType === 'TotalWin' && (this.isBuyFeatureFreeSpinsActive || this.buyFeatureController?.isSpinLocked?.())) {
 				this.buyFeatureController?.setSpinLock(false);
 				this.isBuyFeatureFreeSpinsActive = false;
 				this.updateBetButtonsStateWithLock();
 				this.updateAutoplayButtonStateWithLock();
 				this.updateTurboButtonStateWithLock();
 				this.updateAmplifyButtonStateWithLock();
-				this.enableBetBackgroundInteraction('TotalW_BZ dialog shown');
+				this.enableBetBackgroundInteraction('TotalWin dialog shown');
 			}
 		});
 	}
 
 	private async finalizeBonusBalanceAfterTotalWinDialog(): Promise<void> {
 		if (this.hasFinalizedBonusBalanceForCurrentRound) {
-			console.log('[SlotController] TotalW_BZ balance finalization already performed for this bonus round');
+			console.log('[SlotController] TotalWin balance finalization already performed for this bonus round');
 			return;
 		}
 
 		try {
 			const bonusTotal = this.getFinalBonusTotalForBalance();
 			if (!(bonusTotal > 0)) {
-				console.log('[SlotController] TotalW_BZ bonus total is 0 - no balance credit applied');
+				console.log('[SlotController] TotalWin bonus total is 0 - no balance credit applied');
 				return;
 			}
 			this.hasFinalizedBonusBalanceForCurrentRound = true;
@@ -5025,7 +5025,7 @@ export class SlotController {
 				const newBalance = oldBalance + bonusTotal;
 				this.updateBalanceAmount(newBalance);
 				this.gameAPI?.updateDemoBalance(newBalance);
-				console.log(`[SlotController] Demo bonus total credited on TotalW_BZ: +$${bonusTotal} (${oldBalance} -> ${newBalance})`);
+				console.log(`[SlotController] Demo bonus total credited on TotalWin: +$${bonusTotal} (${oldBalance} -> ${newBalance})`);
 				return;
 			}
 
@@ -5045,17 +5045,17 @@ export class SlotController {
 				const missing = expectedAfterBonus - afterSyncBalance;
 				this.updateBalanceAmount(expectedAfterBonus);
 				console.log(
-					`[SlotController] TotalW_BZ: server balance did not include full bonus. ` +
+					`[SlotController] TotalWin: server balance did not include full bonus. ` +
 					`Applied local top-up +$${missing.toFixed(2)} to reach $${expectedAfterBonus.toFixed(2)}`
 				);
 			} else {
 				console.log(
-					`[SlotController] TotalW_BZ: server balance already includes bonus credit (${afterSyncBalance} >= ${expectedAfterBonus})`
+					`[SlotController] TotalWin: server balance already includes bonus credit (${afterSyncBalance} >= ${expectedAfterBonus})`
 				);
 			}
 		} catch (e) {
 			this.hasFinalizedBonusBalanceForCurrentRound = false;
-			console.error('[SlotController] Failed to finalize balance on TotalW_BZ:', e);
+			console.error('[SlotController] Failed to finalize balance on TotalWin:', e);
 		}
 	}
 

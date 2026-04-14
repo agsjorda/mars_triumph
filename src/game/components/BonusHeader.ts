@@ -44,7 +44,7 @@ export class BonusHeader {
 	private scene: Scene | null = null;
 	// Track if we just seeded the win to prevent immediate text overrides
 	private justSeededWin: boolean = false;
-	// Suppress win bar text while TotalW_BZ dialog is showing
+	// Suppress win bar text while TotalWin dialog is showing
 	private suppressWinbarDisplay: boolean = false;
 
 	constructor(networkManager: NetworkManager, screenModeManager: ScreenModeManager) {
@@ -81,7 +81,7 @@ export class BonusHeader {
 		// Set up event listeners for winnings updates (like regular header)
 		this.setupWinningsEventListener();
 
-		// Hide win bar text while TotalW_BZ dialog is visible
+		// Hide win bar text while TotalWin dialog is visible
 		this.setupWinbarSuppressionListeners(scene);
 		
 		// Initialize winnings display - start hidden
@@ -111,10 +111,10 @@ export class BonusHeader {
 
 	private setupWinbarSuppressionListeners(scene: Scene): void {
 		scene.events.on('dialogShown', (dialogType: string) => {
-			if (dialogType === 'TotalW_BZ') {
+			if (dialogType === 'TotalWin') {
 				this.suppressWinbarDisplay = true;
 				this.forceHideWinningsDisplay();
-				console.log('[BonusHeader] TotalW_BZ shown - suppressing winbar display');
+				console.log('[BonusHeader] TotalWin shown - suppressing winbar display');
 			}
 		});
 		scene.events.on('hideBonusHeader', () => {
@@ -632,7 +632,7 @@ export class BonusHeader {
 	}
 
 	/**
-	 * Ensure header shows accumulated TOTAL WIN immediately before TotalW_BZ dialog.
+	 * Ensure header shows accumulated TOTAL WIN immediately before TotalWin dialog.
 	 * Symbols calls this right before showing the dialog.
 	 */
 	public showTotalWinBeforeCongrats(totalWin: number): void {
@@ -718,7 +718,7 @@ export class BonusHeader {
 	}
 
 	/**
-	 * Force-hide the win bar text (used when TotalW_BZ dialog is shown).
+	 * Force-hide the win bar text (used when TotalWin dialog is shown).
 	 */
 	public forceHideWinningsDisplay(): void {
 		if (this.amountText && this.youWonText) {

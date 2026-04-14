@@ -31,15 +31,18 @@ export class AssetLoader {
 			Object.entries(assetGroup.spine).forEach(([key, spineData]) => {
 				try {
 					const anyLoad: any = scene.load as any;
-					if (typeof anyLoad.spine === 'function') {
+					const hasSeparate =
+						typeof anyLoad.spineJson === 'function' && typeof anyLoad.spineAtlas === 'function';
+					// Prefer spineJson/spineAtlas so data lands in json cache (spine-phaser-v3 getSkeletonData).
+					if (hasSeparate) {
+						console.log(`[AssetLoader] Loading spine (separate): ${key} from ${spineData.json}`);
+						scene.load.spineAtlas(`${key}-atlas`, spineData.atlas);
+						scene.load.spineJson(key, spineData.json);
+					} else if (typeof anyLoad.spine === 'function') {
 						console.log(`[AssetLoader] Loading spine (combined): ${key}`);
 						console.log(`[AssetLoader]   JSON: ${spineData.json}`);
 						console.log(`[AssetLoader]   Atlas: ${spineData.atlas}`);
 						anyLoad.spine(key, spineData.json, spineData.atlas, true);
-					} else {
-						console.log(`[AssetLoader] Loading spine (separate): ${key} from ${spineData.json}`);
-						scene.load.spineAtlas(`${key}-atlas`, spineData.atlas);
-						scene.load.spineJson(key, spineData.json);
 					}
 				} catch (e) {
 					console.warn(`[AssetLoader] Failed loading spine ${key}:`, e);
