@@ -253,14 +253,14 @@ export class Game extends Scene {
 			console.warn('[Game] Physics system not available');
 		}
 
-		// Create fade overlay for transition from black
+		// Full-screen fade-in after Preloader (covers all UI including high-depth HUD)
 		const fadeOverlay = this.add.rectangle(
 			this.scale.width * 0.5,
 			this.scale.height * 0.5,
 			this.scale.width,
 			this.scale.height,
 			0x000000
-		).setOrigin(0.5, 0.5).setScrollFactor(0).setAlpha(1);
+		).setOrigin(0.5, 0.5).setScrollFactor(0).setAlpha(1).setDepth(150000);
 
 		// Keep layout responsive (fullscreen / parent resize / orientation changes).
 		this.scale.on('resize', this.handleResize, this);
@@ -510,7 +510,7 @@ export class Game extends Scene {
 		this.tweens.add({
 			targets: fadeOverlay,
 			alpha: 0,
-			duration: 1000,
+			duration: 3000,
 			ease: 'Power2',
 			onComplete: () => {
 				console.log('[Game] Fade in from black complete');

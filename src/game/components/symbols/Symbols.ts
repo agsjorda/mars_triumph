@@ -60,6 +60,7 @@ import {
   SCATTER_SHRINK_DURATION_MS,
   SCATTER_MOVE_DURATION_MS,
   MULTIPLIER_STAGGER_MS,
+  MULTIPLIER_FLYING_OVERLAY_SCALE_MULTIPLIER,
   SYMBOL_0_Y_OFFSET,
 } from './constants';
 
@@ -470,16 +471,6 @@ export class Symbols {
       });
     } catch { }
 
-    this.scene.events.once('dialogAnimationsComplete', () => {
-      // Wait for the unmerge animation (shrink + move back to grid) to finish
-      // before resuming autoplay to prevent symbol animation conflicts.
-      const unmergeMs = SCATTER_SHRINK_DURATION_MS + SCATTER_MOVE_DURATION_MS + 100;
-      this.scene.time.delayedCall(unmergeMs, () => {
-        this.scatterRetriggerAnimationInProgress = false;
-        this.resumeAutoplayAfterRetriggerDialog();
-      });
-    });
-
     try {
       const liveGrids = this.getLiveScatterGrids();
       const gridsToUse = liveGrids.length > 0 ? liveGrids : storedGrids;
@@ -493,6 +484,37 @@ export class Symbols {
         spinData: this.currentSpinData,
         retriggerSpins,
       });
+
+      // IMPORTANT:
+      // `dialogAnimationsComplete` can fire for unrelated dialogs (e.g. a win dialog that just closed).
+      // For retrigger we must wait for the retrigger FreeSpin dialog lifecycle specifically.
+      await new Promise<void>((resolve) => {
+        const scene = this.scene;
+        if (!scene) {
+          resolve();
+          return;
+        }
+
+        const onFullyDisplayed = (dialogType: string) => {
+          if (dialogType !== 'FreeSpin') return;
+          scene.events.once('dialogAnimationsComplete', () => resolve());
+        };
+
+        scene.events.once('dialogFullyDisplayed', onFullyDisplayed);
+
+        // Safety fallback: if events are missed, don't deadlock the game.
+        scene.time.delayedCall(8000, () => resolve());
+      });
+
+      // Wait for the unmerge animation (shrink + move back to grid) to finish
+      // before resuming autoplay to prevent symbol animation conflicts.
+      const unmergeMs = SCATTER_SHRINK_DURATION_MS + SCATTER_MOVE_DURATION_MS + 100;
+      await new Promise<void>((resolve) => {
+        this.scene.time.delayedCall(unmergeMs, () => resolve());
+      });
+
+      this.scatterRetriggerAnimationInProgress = false;
+      this.resumeAutoplayAfterRetriggerDialog();
       gameEventManager.emit(GameEventType.SCATTER_RETRIGGER_ANIMATION_COMPLETE);
     } catch (e) {
       console.warn('[Symbols] Retrigger sequence failed:', e);
@@ -550,15 +572,29 @@ export class Symbols {
       gameEventManager.emit(GameEventType.SYMBOL0_RETRIGGER_ANIMATION_COMPLETE);
     }
 
-    this.scene.events.once('dialogAnimationsComplete', () => {
-      // Wait for the unmerge animation (shrink + move back to grid) to finish
-      // before resuming autoplay to prevent symbol animation conflicts.
-      const unmergeMs = SCATTER_SHRINK_DURATION_MS + SCATTER_MOVE_DURATION_MS + 100;
-      this.scene.time.delayedCall(unmergeMs, () => {
-        this.scatterRetriggerAnimationInProgress = false;
-        this.resumeAutoplayAfterRetriggerDialog();
+    try {
+      // Same gating as scatter retrigger: wait for retrigger FreeSpin dialog to complete,
+      // then wait for unmerge before resuming autoplay.
+      await new Promise<void>((resolve) => {
+        const scene = this.scene;
+        if (!scene) {
+          resolve();
+          return;
+        }
+        const onFullyDisplayed = (dialogType: string) => {
+          if (dialogType !== 'FreeSpin') return;
+          scene.events.once('dialogAnimationsComplete', () => resolve());
+        };
+        scene.events.once('dialogFullyDisplayed', onFullyDisplayed);
+        scene.time.delayedCall(8000, () => resolve());
       });
-    });
+
+      const unmergeMs = SCATTER_SHRINK_DURATION_MS + SCATTER_MOVE_DURATION_MS + 100;
+      await new Promise<void>((resolve) => this.scene.time.delayedCall(unmergeMs, () => resolve()));
+    } catch { }
+
+    this.scatterRetriggerAnimationInProgress = false;
+    this.resumeAutoplayAfterRetriggerDialog();
   }
 
   private resumeAutoplayAfterRetriggerDialog(): void {
@@ -4505,11 +4541,12 @@ export class Symbols {
       if (value === undefined || value === null) return;
 
       const isMultiplier = MultiplierSymbols.isMultiplier(value);
-      const dropCandidates = isMultiplier
-        ? ['Symbol10_BZ_drop']
+      const multBase = isMultiplier ? MultiplierSymbols.getAnimationBase(value) : null;
+      const dropCandidates = isMultiplier && multBase
+        ? [`${multBase}_drop`]
         : [`Symbol${value}_MT_drop`, `Symbol${value}_BZ_drop`];
-      const idleCandidates = isMultiplier
-        ? ['Symbol10_BZ_idle']
+      const idleCandidates = isMultiplier && multBase
+        ? [`${multBase}_idle`]
         : [`Symbol${value}_MT_idle`, `Symbol${value}_BZ_idle`];
 
       let dropPlayed = false;
@@ -4820,7 +4857,7 @@ export class Symbols {
             // Scale overlay relative to symbol box
             const desiredWidth = Math.max(3, this.displayWidth * 1.3);
             const textureWidth = Math.max(1, overlay.width);
-            overlay.setScale(desiredWidth / textureWidth);
+            overlay.setScale((desiredWidth / textureWidth) * (MULTIPLIER_FLYING_OVERLAY_SCALE_MULTIPLIER || 1));
             overlay.setDepth(9999);
 
             const bonusHeader: any = (this.scene as any)?.bonusHeader;

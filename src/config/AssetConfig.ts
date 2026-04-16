@@ -41,6 +41,11 @@ export class AssetConfig {
 					atlas: `${bgOverlayLightRaysBase}.atlas`,
 					json: `${bgOverlayLightRaysBase}.json`
 				},
+				// Base-game dust overlay (portrait/high asset; used in all modes).
+				BG_Overlay_Dust: {
+					atlas: `assets/portrait/high/vfx/BG_Overlay_Dust.atlas`,
+					json: `assets/portrait/high/vfx/BG_Overlay_Dust.json`,
+				},
 				'di_joker': {
 					atlas: `${prefix}/dijoker_loading/DI JOKER.atlas`,
 					json: `${prefix}/dijoker_loading/DI JOKER.json`
@@ -56,7 +61,14 @@ export class AssetConfig {
 			images: {
 				'BG-Bonus': `${prefix}/bonus_background/BonusGame_BG.webp`,
 				'bonus-bg-cover': `${prefix}/bonus_background/ControllerBonus.webp`,
-			}
+			},
+			// Ambient bonus VFX (looping ambers); portrait/high asset only (used in all modes).
+			spine: {
+				Bonus_Ambers_MT: {
+					atlas: `assets/portrait/high/vfx/Bonus_Ambers_MT.atlas`,
+					json: `assets/portrait/high/vfx/Bonus_Ambers_MT.json`,
+				},
+			},
 		};
 	}
 
@@ -130,29 +142,38 @@ export class AssetConfig {
 		const symbolSpine: { [key: string]: { atlas: string; json: string } } = {};
 
 		// Symbol Spine animations for Symbol0–Symbol9 (portrait/high bundle).
-		const bzSymbolRoot = 'assets/portrait/high/symbols';
+		const symbolRoot = 'assets/portrait/high/symbols';
 		for (let i = 0; i <= 9; i++) {
 			const spineKey = `symbol_${i}_spine`;
 			const sugarAliasKey = `symbol_${i}_sugar_spine`;
-			const atlas = `${bzSymbolRoot}/Symbol${i}_${suffix}.atlas`;
-			const json = `${bzSymbolRoot}/Symbol${i}_${suffix}.json`;
+			const atlas = `${symbolRoot}/Symbol${i}_${suffix}.atlas`;
+			const json = `${symbolRoot}/Symbol${i}_${suffix}.json`;
 			symbolSpine[spineKey] = { atlas: atlas, json: json };
 			symbolSpine[sugarAliasKey] = { atlas: atlas, json: json };
 		}
 
-		// Multiplier symbol still uses the existing BZ spine files.
+		// Multiplier symbols (10–22): three tiered spines (same ID ranges as Felice / sugar_wonderland).
 		symbolSpine['symbol_10_spine'] = {
-			atlas: `${bzSymbolRoot}/Symbol10_BZ.atlas`,
-			json: `${bzSymbolRoot}/Symbol10_BZ.json`
+			atlas: `${symbolRoot}/Symbol10_MT.atlas`,
+			json: `${symbolRoot}/Symbol10_MT.json`
 		};
+		symbolSpine['symbol_11_spine'] = {
+			atlas: `${symbolRoot}/Symbol11_MT.atlas`,
+			json: `${symbolRoot}/Symbol11_MT.json`
+		};
+		symbolSpine['symbol_12_spine'] = {
+			atlas: `${symbolRoot}/Symbol12_MT.atlas`,
+			json: `${symbolRoot}/Symbol12_MT.json`
+		};
+		// Legacy alias (some code paths still reference sugar key for tier-1 multiplier)
 		symbolSpine['symbol_10_sugar_spine'] = {
-			atlas: `${bzSymbolRoot}/Symbol10_BZ.atlas`,
-			json: `${bzSymbolRoot}/Symbol10_BZ.json`
+			atlas: `${symbolRoot}/Symbol10_MT.atlas`,
+			json: `${symbolRoot}/Symbol10_MT.json`
 		};
 
 		// symbols for helper
 		for (let i = 0; i <= 9; i++) {
-			const spritePath = `${bzSymbolRoot}/statics/symbol${i}.png`;
+			const spritePath = `${symbolRoot}/statics/symbol${i}.png`;
 			const helperKey = `symbol${i}`;
 			const fallbackKey = `symbol_${i}`;
 			// const atlas = `${bzSymbolRoot}/statics/Symbol${i}_${suffix}.atlas`;
@@ -183,7 +204,7 @@ export class AssetConfig {
 		Object.entries(overlayMap).forEach(([valueStr, label]) => {
 			const value = Number(valueStr);
 			const key = `multiplier_overlay_${value}`;
-			const path = `${bzSymbolRoot}/multiplier_symbols/${label}.webp`;
+			const path = `${symbolRoot}/multiplier_symbols/${label}.webp`;
 			symbolImages[key] = path;
 			console.log(`[AssetConfig] Multiplier overlay ${value}: ${path}`);
 		});

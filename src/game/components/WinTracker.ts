@@ -6,6 +6,7 @@ import { Logger } from '../../utils/Logger';
 import { getMultiplierValue, isMultiplierSymbol } from '../../types/SymbolTypes';
 import { gameStateManager } from '../../managers/GameStateManager';
 import { formatCurrencyNumber } from '../../utils/NumberPrecisionFormatter';
+import { MultiplierSymbols } from './symbols/MultiplierSymbols';
 
 interface WinTrackerLayoutOptions {
   offsetX?: number;
@@ -581,34 +582,35 @@ export class WinTracker {
       }
     } catch {}
 
-    // Try multipliers (10–22) using Symbol10_BZ spine
+    // Try multipliers (10–22): tiered Symbol10_MT / Symbol11_MT / Symbol12_MT spines
     try {
       if (symbolId >= 10 && symbolId <= 22) {
         if (ensureSpineFactory(this.scene, 'WinTracker')) {
-          const multiKey = `symbol_10_sugar_spine`;
-          const multiAtlasKey = `${multiKey}-atlas`;
-          const go: any = (this.scene.add as any).spine?.(0, 0, multiKey, multiAtlasKey);
-          if (go) {
-            try { go.setOrigin?.(0.5, 0.5); } catch {}
-            try { go.setScale?.(this.iconScale); } catch {}
-            try {
-              const base = this.getMultiplierAnimationBase(symbolId);
-              const idle = base ? `${base}_idle` : null;
-              if (idle && go.animationState?.setAnimation) {
-                const entry = go.animationState.setAnimation(0, idle, true);
-                try {
-                  const duration = (go as any)?.skeleton?.data?.findAnimation?.(idle)?.duration;
-                  if (typeof duration === 'number' && duration > 0 && entry) {
-                    (entry as any).trackTime = Math.random() * duration;
-                  }
-                } catch {}
-                try {
-                  const speedJitter = 0.95 + Math.random() * 0.1;
-                  (go.animationState as any).timeScale = speedJitter;
-                } catch {}
-              }
-            } catch {}
-            return { icon: go, isSpine: true };
+          const multiKey = MultiplierSymbols.getSpineAssetKey(symbolId);
+          if (multiKey) {
+            const multiAtlasKey = `${multiKey}-atlas`;
+            const go: any = (this.scene.add as any).spine?.(0, 0, multiKey, multiAtlasKey);
+            if (go) {
+              try { go.setOrigin?.(0.5, 0.5); } catch {}
+              try { go.setScale?.(this.iconScale); } catch {}
+              try {
+                const idle = MultiplierSymbols.getIdleAnimationName(symbolId);
+                if (idle && go.animationState?.setAnimation) {
+                  const entry = go.animationState.setAnimation(0, idle, true);
+                  try {
+                    const duration = (go as any)?.skeleton?.data?.findAnimation?.(idle)?.duration;
+                    if (typeof duration === 'number' && duration > 0 && entry) {
+                      (entry as any).trackTime = Math.random() * duration;
+                    }
+                  } catch {}
+                  try {
+                    const speedJitter = 0.95 + Math.random() * 0.1;
+                    (go.animationState as any).timeScale = speedJitter;
+                  } catch {}
+                }
+              } catch {}
+              return { icon: go, isSpine: true };
+            }
           }
         }
       }
@@ -620,10 +622,6 @@ export class WinTracker {
     img.setOrigin(0.5, 0.5);
     img.setScale(this.iconScale);
     return { icon: img, isSpine: false };
-  }
-
-  private getMultiplierAnimationBase(value: number): string | null {
-    return (value >= 10 && value <= 22) ? 'Symbol10_BZ' : null;
   }
 
   private getPaylineMultiplier(payline: any): number {

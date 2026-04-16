@@ -168,11 +168,29 @@ export const MULTIPLIER_VALUES: Record<number, number> = {
 } as const;
 
 /**
- * Maps multiplier symbol IDs to their Spine animation base names
+ * Maps multiplier tier skeletons (MT) to grid symbol IDs they represent
  */
 export const MULTIPLIER_ANIMATION_BASES: Record<string, number[]> = {
-  'Symbol10_BZ': [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+  Symbol10_MT: [10, 11, 12, 13, 14, 15, 16],
+  Symbol11_MT: [17, 18, 19, 20],
+  Symbol12_MT: [21, 22],
 } as const;
+
+// ============================================================================
+// MULTIPLIER OVERLAY SCALE TUNING
+// ============================================================================
+
+/**
+ * Scale multiplier for the in-grid multiplier digit overlay (PNG/WebP).
+ * Applied as a multiplier against the computed fit-to-width scale.
+ */
+export const MULTIPLIER_OVERLAY_SCALE_MULTIPLIER = .7;
+
+/**
+ * Scale multiplier for the "flying" multiplier digit overlay that travels to the header.
+ * Applied as a multiplier against the computed fit-to-width scale.
+ */
+export const MULTIPLIER_FLYING_OVERLAY_SCALE_MULTIPLIER = .7;
 
 // ============================================================================
 // SCATTER CONFIGURATION

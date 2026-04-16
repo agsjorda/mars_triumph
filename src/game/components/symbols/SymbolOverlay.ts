@@ -16,6 +16,7 @@ import {
   DEPTH_RETRIGGER_SYMBOL,
   OVERLAY_FADE_IN_DURATION_MS,
   OVERLAY_FADE_OUT_DURATION_MS,
+  MULTIPLIER_OVERLAY_SCALE_MULTIPLIER,
 } from './constants';
 import { MultiplierSymbols } from './MultiplierSymbols';
 import { formatCurrencyNumber } from '../../../utils/NumberPrecisionFormatter';
@@ -248,16 +249,15 @@ export class SymbolOverlay {
     const text = this.scene.add.text(x, y, textValue, {
       fontFamily: 'Poppins-Bold',
       fontSize: `${fontSize}px`,
-      color: '#FFFFFF',
+      color: '#ffffff',
       align: 'center'
     } as any);
     
     text.setOrigin(0.5, 0.5);
     
-    // Add stroke and shadow
+    // Match WinTracker label style: white fill + dark green stroke, no shadow.
     try {
-      (text as any).setStroke?.('#FA2A55', Math.max(2, Math.round(fontSize * 0.12)));
-      (text as any).setShadow?.(0, 2, '#000000', Math.max(2, Math.round(fontSize * 0.15)), true, true);
+      (text as any).setStroke?.('#004D00', 4);
     } catch { /* ignore */ }
     
     return text;
@@ -297,14 +297,14 @@ export class SymbolOverlay {
       const desiredWidth = Math.max(3, displayWidth * .9);
       const textureWidth = Math.max(1, overlay.width);
       const scale = desiredWidth / textureWidth;
-      overlay.setScale(scale);
+      overlay.setScale(scale * (MULTIPLIER_OVERLAY_SCALE_MULTIPLIER || 1));
       
       // Add bounce animation
       try {
         const bounceTween = this.scene.tweens.add({
           targets: overlay,
-          scaleX: scale * 0.88,
-          scaleY: scale * 0.88,
+          scaleX: scale * (MULTIPLIER_OVERLAY_SCALE_MULTIPLIER || 1) * 0.88,
+          scaleY: scale * (MULTIPLIER_OVERLAY_SCALE_MULTIPLIER || 1) * 0.88,
           duration: 300,
           yoyo: true,
           repeat: -1,

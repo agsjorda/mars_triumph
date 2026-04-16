@@ -3,6 +3,7 @@ import { SpineGameObject } from '@esotericsoftware/spine-phaser-v3';
 import { NetworkManager } from "../../managers/NetworkManager";
 import { ScreenModeManager } from "../../managers/ScreenModeManager";
 import { gameStateManager } from "../../managers/GameStateManager";
+import { ensureSpineFactory } from "../../utils/SpineGuard";
 
 export class Background {
 	private bgContainer!: Phaser.GameObjects.Container;
@@ -10,8 +11,13 @@ export class Background {
 	private screenModeManager: ScreenModeManager;
 	private normalBgCover: Phaser.GameObjects.Image | null = null;
 	private bgDefault: SpineGameObject | null = null;
+	private bgDust: SpineGameObject | null = null;
 	// ADJUST HERE (BG-Default): scale multiplier for the BG_Overlay_Light_Rays spine animation.
 	private bgDefaultScaleMultiplier: number = 1;
+	// ADJUST HERE: scale multiplier for BG_Overlay_Dust (base game only).
+	private bgDustScaleMultiplier: number = 1;
+	private static readonly BG_OVERLAY_DUST_DESIGN_W = 428;
+	private static readonly BG_OVERLAY_DUST_DESIGN_H = 926;
 	// normal-bg-cover (ControllerNormal): size is (height fraction fit) × (scale multipliers).
 	// - coverHeightPercentOfScene: target height as a fraction of scene height (e.g. 0.5 = half screen).
 	// - NORMAL_BG_COVER_SCALE_MULTIPLIER_*: extra multiply on that fit (1 = no change); X/Y can differ (stretch).
@@ -70,6 +76,8 @@ export class Background {
 			this.bgDefault = null;
 		}
 
+		this.createBgOverlayDust(scene);
+
 		// normal-bg-cover: foreground overlay (controller area). Keep it out of the container
 		// so its depth can reliably sit above symbols/winlines if needed.
 		// Origin bottom-center: y is the bottom edge of the image (aligns to scene bottom in layout).
@@ -78,6 +86,49 @@ export class Background {
 			scene.scale.height,
 			'normal-bg-cover'
 		).setOrigin(0.5, 1).setDepth(850);
+	}
+
+	/** Full-screen dust loop; base game only (hidden in bonus). Drawn above light rays. */
+	private createBgOverlayDust(scene: Scene): void {
+		if (!ensureSpineFactory(scene, '[Background] BG_Overlay_Dust')) {
+			return;
+		}
+		try {
+			const cx = scene.scale.width * 0.5;
+			const cy = scene.scale.height * 0.5;
+			this.bgDust = (scene.add as any).spine(
+				cx,
+				cy,
+				'BG_Overlay_Dust',
+				'BG_Overlay_Dust-atlas'
+			) as SpineGameObject;
+			this.bgDust.setOrigin(0.5, 0.5);
+			this.applyBgDustLayout(scene);
+			try {
+				this.bgDust.animationState.setAnimation(0, 'animation', true);
+			} catch {
+				console.warn('[Background] BG_Overlay_Dust: failed to start animation');
+			}
+			this.bgContainer.add(this.bgDust);
+			try {
+				this.bgContainer.bringToTop(this.bgDust);
+			} catch { /* noop */ }
+		} catch (e) {
+			console.warn('[Background] Failed to create BG_Overlay_Dust spine:', e);
+			this.bgDust = null;
+		}
+	}
+
+	private applyBgDustLayout(scene: Scene): void {
+		if (!this.bgDust) return;
+		const w = scene.scale.width;
+		const h = scene.scale.height;
+		this.bgDust.setPosition(w * 0.5, h * 0.5);
+		const sw = Background.BG_OVERLAY_DUST_DESIGN_W;
+		const sh = Background.BG_OVERLAY_DUST_DESIGN_H;
+		const cover = Math.max(w / sw, h / sh);
+		const mult = Phaser.Math.Clamp(this.bgDustScaleMultiplier, 0.1, 5);
+		this.bgDust.setScale(cover * mult);
 	}
 
 	// adjustments for the background layout
@@ -90,6 +141,10 @@ export class Background {
 			// ADJUST HERE (BG-Default): scale multiplier for the BG_Overlay_Light_Rays spine.
 			const multiplier = Phaser.Math.Clamp(this.bgDefaultScaleMultiplier, 0.1, 5);
 			this.bgDefault.setScale(multiplier);
+		}
+
+		if (this.bgDust) {
+			this.applyBgDustLayout(scene);
 		}
 
 		if (this.normalBgCover) {
@@ -130,6 +185,14 @@ export class Background {
 				this.bgDefault.setVisible(!isBonus);
 				console.log(`[Background] BG-Default (BG_Overlay_Light_Rays) visibility set to: ${!isBonus} (isBonus: ${isBonus})`);
 			}
+			if (this.bgDust) {
+				this.bgDust.setVisible(!isBonus);
+				if (!isBonus) {
+					try {
+						this.bgDust.animationState.setAnimation(0, 'animation', true);
+					} catch { /* noop */ }
+				}
+			}
 
 			if (this.normalBgCover) {
 				// Show normal cover only when NOT in bonus mode (fallback if Spine not used)
@@ -144,6 +207,14 @@ export class Background {
 		if (this.bgDefault) {
 			this.bgDefault.setVisible(!isBonus);
 			console.log(`[Background] Initial BG_Overlay_Light_Rays visibility: ${!isBonus} (isBonus: ${isBonus})`);
+		}
+		if (this.bgDust) {
+			this.bgDust.setVisible(!isBonus);
+			if (!isBonus) {
+				try {
+					this.bgDust.animationState.setAnimation(0, 'animation', true);
+				} catch { /* noop */ }
+			}
 		}
 		if (this.normalBgCover) {
 			this.normalBgCover.setVisible(!isBonus);

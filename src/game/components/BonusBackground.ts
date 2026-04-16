@@ -1,8 +1,9 @@
 import { Scene } from "phaser";
+import { SpineGameObject } from '@esotericsoftware/spine-phaser-v3';
 import { NetworkManager } from "../../managers/NetworkManager";
 import { ScreenModeManager } from "../../managers/ScreenModeManager";
 import { gameStateManager } from "../../managers/GameStateManager";
-import { gameEventManager, GameEventType } from "../../event/EventManager";
+import { ensureSpineFactory } from "../../utils/SpineGuard";
 
 export class BonusBackground {
 	private bonusContainer!: Phaser.GameObjects.Container;
@@ -10,7 +11,12 @@ export class BonusBackground {
 	private screenModeManager: ScreenModeManager;
 	private bonusBg: Phaser.GameObjects.Image | null = null; // Static bonus background (BonusGame_BG.webp)
 	private bonusBgCover: Phaser.GameObjects.Image | null = null;
+	private bonusAmbers: SpineGameObject | null = null;
 	private scene: Scene | null = null;
+
+	/** Skeleton design size from Bonus_Ambers_MT.json (used for cover scaling). */
+	private static readonly BONUS_AMBERS_DESIGN_W = 428;
+	private static readonly BONUS_AMBERS_DESIGN_H = 926;
 	
 	// ============================================
 	// ADJUST HERE: Vertical offset for bonus background image
@@ -35,6 +41,10 @@ export class BonusBackground {
 	// 1 = 100% / no change. X/Y can differ to stretch vertically if needed.
 	private readonly BONUS_BG_COVER_SCALE_MULTIPLIER_X: number = 1;
 	private readonly BONUS_BG_COVER_SCALE_MULTIPLIER_Y: number = .9;
+
+	// Time-scale multiplier for Bonus_Ambers_MT animation speed.
+	// 1 = normal speed, 0.5 = half speed, 2 = double speed.
+	private readonly BONUS_AMBERS_TIME_SCALE_MULTIPLIER: number = 1;
 
 	constructor(networkManager: NetworkManager, screenModeManager: ScreenModeManager) {
 		this.networkManager = networkManager;
@@ -76,6 +86,50 @@ export class BonusBackground {
 		} else {
 			this.createLandscapeBonusBackground(scene, assetScale);
 		}
+		this.createBonusAmbersVfx(scene);
+	}
+
+	/** Looping additive ambers; visible only while bonus mode is active. */
+	private createBonusAmbersVfx(scene: Scene): void {
+		if (!ensureSpineFactory(scene, '[BonusBackground] Bonus_Ambers_MT')) {
+			return;
+		}
+		try {
+			const cx = scene.scale.width * 0.5;
+			const cy = scene.scale.height * 0.5 + this.bonusBackgroundYOffset;
+			this.bonusAmbers = (scene.add as any).spine(
+				cx,
+				cy,
+				'Bonus_Ambers_MT',
+				'Bonus_Ambers_MT-atlas'
+			) as SpineGameObject;
+			this.bonusAmbers.setOrigin(0.5, 0.5);
+			this.applyBonusAmbersLayout(scene);
+			try {
+				this.bonusAmbers.animationState.timeScale = this.BONUS_AMBERS_TIME_SCALE_MULTIPLIER;
+				this.bonusAmbers.animationState.setAnimation(0, 'animation', true);
+			} catch {
+				console.warn('[BonusBackground] Bonus_Ambers_MT: failed to start animation');
+			}
+			this.bonusAmbers.setVisible(false);
+			this.bonusContainer.add(this.bonusAmbers);
+		} catch (e) {
+			console.warn('[BonusBackground] Failed to create Bonus_Ambers_MT spine:', e);
+			this.bonusAmbers = null;
+		}
+	}
+
+	private applyBonusAmbersLayout(scene: Scene): void {
+		if (!this.bonusAmbers) return;
+		const w = scene.scale.width;
+		const h = scene.scale.height;
+		const cx = w * 0.5;
+		const cy = h * 0.5 + this.bonusBackgroundYOffset;
+		this.bonusAmbers.setPosition(cx, cy);
+		const sw = BonusBackground.BONUS_AMBERS_DESIGN_W;
+		const sh = BonusBackground.BONUS_AMBERS_DESIGN_H;
+		const cover = Math.max(w / sw, h / sh);
+		this.bonusAmbers.setScale(cover);
 	}
 
 	private createPortraitBonusBackground(scene: Scene, assetScale: number): void {
@@ -170,6 +224,10 @@ export class BonusBackground {
 			this.scaleBonusCoverToWidth(this.bonusBgCover, width);
 		}
 
+		if (this.scene) {
+			this.applyBonusAmbersLayout(this.scene);
+		}
+
 	}
 
 	resize(scene: Scene): void {
@@ -207,6 +265,15 @@ export class BonusBackground {
 				this.bonusBgCover.setVisible(isBonus);
 				console.log(`[BonusBackground] Bonus bg cover visibility: ${isBonus}`);
 			}
+			if (this.bonusAmbers) {
+				this.bonusAmbers.setVisible(isBonus);
+				if (isBonus) {
+					try {
+						this.bonusAmbers.animationState.timeScale = this.BONUS_AMBERS_TIME_SCALE_MULTIPLIER;
+						this.bonusAmbers.animationState.setAnimation(0, 'animation', true);
+					} catch { /* noop */ }
+				}
+			}
 		});
 
 		// Set initial visibility based on current bonus state
@@ -215,6 +282,15 @@ export class BonusBackground {
 		if (this.bonusBgCover) {
 			this.bonusBgCover.setVisible(isBonus);
 			console.log(`[BonusBackground] Initial bonus bg cover visibility: ${isBonus} (isBonus: ${isBonus})`);
+		}
+		if (this.bonusAmbers) {
+			this.bonusAmbers.setVisible(isBonus);
+			if (isBonus) {
+				try {
+					this.bonusAmbers.animationState.timeScale = this.BONUS_AMBERS_TIME_SCALE_MULTIPLIER;
+					this.bonusAmbers.animationState.setAnimation(0, 'animation', true);
+				} catch { /* noop */ }
+			}
 		}
 	}
 }

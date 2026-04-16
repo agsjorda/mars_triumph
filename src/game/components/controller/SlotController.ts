@@ -3037,6 +3037,16 @@ export class SlotController {
 
 			if (gameStateManager.isBonusExitTransitionActive) {
 				console.log('[SlotController] AUTO_STOP during bonus exit transition - skipping base re-enable');
+				// Ensure we still restore the spin button once the transition completes.
+				// Some flows can emit AUTO_STOP while the black-screen transition is active; if we
+				// return here without a follow-up, spin can remain non-interactive.
+				try {
+					this.scene?.events?.once('bonusTransitionComplete', () => {
+						this.updateSpinButtonState();
+						this.updateAllAuxiliaryButtonStates();
+						this.updateFeatureButtonState();
+					});
+				} catch { }
 				return;
 			}
 			

@@ -11,7 +11,7 @@ import { ensureSpineFactory } from '../../utils/SpineGuard';
 import { StudioLoadingScreen } from '../components/StudioLoadingScreen';
 import { ClockDisplay } from '../components/ClockDisplay';
 import { VersionManager } from '../../managers/VersionManager';
-import { playRadialDimmerTransition } from '../utils/playRadialDimmerTransition';
+// import { playRadialDimmerTransition } from '../utils/playRadialDimmerTransition';
 import { CurrencyManager } from '../components/CurrencyManager';
 import { localizationManager } from '../../managers/LocalizationManager';
 import { unresolvedSpinManager } from '../../managers/UnresolvedSpinManager';
@@ -534,16 +534,30 @@ export class Preloader extends Scene
 		//     0x000000
 		// ).setOrigin(0.5, 0.5).setScrollFactor(0).setAlpha(0);
 
-        // Start game on click
+        // Start game on click (radial dimmer disabled — Game scene fades in from black)
         this.buttonSpin?.once('pointerdown', () => {
-            playRadialDimmerTransition(this, () => {
-                console.log('[Preloader] Starting Game scene after radial dimmer');
-                this.scene.start('Game', { 
-                    networkManager: this.networkManager, 
-                    screenModeManager: this.screenModeManager,
-                    // Pass the same GameAPI instance so initialization data is shared
-                    gameAPI: this.gameAPI
-                });
+            try { (this.sound as any)?.unlock?.(); } catch { /* noop */ }
+            try {
+                const ctx: any = (this.sound as any)?.context;
+                if (ctx && typeof ctx.resume === 'function' && ctx.state === 'suspended') {
+                    void ctx.resume();
+                }
+            } catch { /* noop */ }
+
+            // playRadialDimmerTransition(this, () => {
+            //     console.log('[Preloader] Starting Game scene after radial dimmer');
+            //     this.scene.start('Game', {
+            //         networkManager: this.networkManager,
+            //         screenModeManager: this.screenModeManager,
+            //         gameAPI: this.gameAPI
+            //     });
+            // });
+
+            console.log('[Preloader] Starting Game scene');
+            this.scene.start('Game', {
+                networkManager: this.networkManager,
+                screenModeManager: this.screenModeManager,
+                gameAPI: this.gameAPI
             });
         });
 

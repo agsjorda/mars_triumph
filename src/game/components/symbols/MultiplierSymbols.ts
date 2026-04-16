@@ -72,14 +72,30 @@ export class MultiplierSymbols {
   // ============================================================================
 
   /**
-   * Get the Spine animation base name for a multiplier symbol
-   * Returns null if the symbol is not a multiplier
-   * 
+   * Loader/cache key for the Spine asset (Felice-style tiered multipliers).
+   * IDs 10–16 → symbol_10_spine (Symbol10_MT), 17–20 → symbol_11_spine, 21–22 → symbol_12_spine.
+   */
+  public static getSpineAssetKey(symbolValue: number): string | null {
+    if (!this.isMultiplier(symbolValue)) return null;
+    if (symbolValue >= 10 && symbolValue <= 16) return 'symbol_10_spine';
+    if (symbolValue >= 17 && symbolValue <= 20) return 'symbol_11_spine';
+    if (symbolValue >= 21 && symbolValue <= 22) return 'symbol_12_spine';
+    return null;
+  }
+
+  /**
+   * Spine animation name prefix inside the tier skeleton (matches JSON animation keys before _idle/_win/_drop).
+   *
    * @example
-   * MultiplierSymbols.getAnimationBase(10) // returns 'Symbol10_BZ'
+   * MultiplierSymbols.getAnimationBase(10) // 'Symbol10_MT'
+   * MultiplierSymbols.getAnimationBase(17) // 'Symbol11_MT'
    */
   public static getAnimationBase(symbolValue: number): string | null {
-    return this.isMultiplier(symbolValue) ? 'Symbol10_BZ' : null;
+    if (!this.isMultiplier(symbolValue)) return null;
+    if (symbolValue >= 10 && symbolValue <= 16) return 'Symbol10_MT';
+    if (symbolValue >= 17 && symbolValue <= 20) return 'Symbol11_MT';
+    if (symbolValue >= 21 && symbolValue <= 22) return 'Symbol12_MT';
+    return null;
   }
 
   /**

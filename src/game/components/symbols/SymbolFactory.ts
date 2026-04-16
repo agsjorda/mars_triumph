@@ -207,8 +207,9 @@ export class SymbolFactory {
   ): SymbolObject | null {
     const idleName = MultiplierSymbols.getIdleAnimationName(value);
     if (!idleName) return null;
-    
-    const spineKey = this.getSymbolSpineKey(10);
+
+    const spineKey = MultiplierSymbols.getSpineAssetKey(value);
+    if (!spineKey) return null;
     const atlasKey = `${spineKey}-atlas`;
     
     // Check if add.spine exists
