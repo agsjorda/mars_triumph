@@ -933,8 +933,8 @@ export class Dialogs {
 			// NumberDisplay only has digit/comma/dot textures — do not prefix currency code or symbol.
 			prefix: '',
 			suffix: '', // No suffix - only display numbers
-			commaYOffset: 12,
-			dotYOffset: 10
+			commaYOffset: 30,
+			dotYOffset: 20
 		};
 
 		// Create the number display (primary win amount / free spins, depending on dialog)
