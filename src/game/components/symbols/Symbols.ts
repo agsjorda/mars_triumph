@@ -143,13 +143,14 @@ export class Symbols {
     return Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
   }
 
-  private getDropPerSymbolStaggerMs(): number {
+  private getDropPerSymbolStaggerMs(isTurbo: boolean): number {
+    if (isTurbo) return 0;
     return Math.max(0, Number(TIMING_CONFIG.DROP_SYMBOL_STAGGER_MS ?? 0) || 0);
   }
 
   /** Bottom-first row delay: bottom row starts first, top row starts last. */
-  private getBottomFirstRowDelayMs(row: number, totalRows: number): number {
-    const perSymbolStagger = this.getDropPerSymbolStaggerMs();
+  private getBottomFirstRowDelayMs(row: number, totalRows: number, isTurbo: boolean): number {
+    const perSymbolStagger = this.getDropPerSymbolStaggerMs(isTurbo);
     if (perSymbolStagger <= 0) return 0;
     const clampedTotal = Math.max(1, Number(totalRows) || 1);
     const clampedRow = Math.max(0, Math.min(clampedTotal - 1, Number(row) || 0));
@@ -4043,7 +4044,7 @@ export class Symbols {
 
         const tweenTargets: any = overlayObj ? [baseObj, overlayObj] : baseObj;
         // Per-column stagger + optional per-symbol stagger (same rowIndex across columns).
-        const delayMs = Math.max(0, STAGGER_MS * col) + (this.getDropPerSymbolStaggerMs() * rowIndex);
+        const delayMs = Math.max(0, STAGGER_MS * col) + (this.getDropPerSymbolStaggerMs(isTurbo) * rowIndex);
 
         if (delayMs > 0) {
           this.scene.time.delayedCall(delayMs, () => {
@@ -4215,7 +4216,7 @@ export class Symbols {
           if (overlayObj) this.scene.tweens.killTweensOf(overlayObj);
         } catch { }
 
-        const rowDelay = this.getBottomFirstRowDelayMs(row, col.length);
+        const rowDelay = this.getBottomFirstRowDelayMs(row, col.length, isTurbo);
 
         const tweens: any[] = [
           {
@@ -4442,7 +4443,7 @@ export class Symbols {
         const overlayObj: any = (baseObj as any)?.__overlayImage;
         const tweenTargets: any = overlayObj ? [baseObj, overlayObj] : baseObj;
         // Optional per-symbol stagger within the column (bottom starts first).
-        const delayMs = this.getBottomFirstRowDelayMs(row, numRows);
+        const delayMs = this.getBottomFirstRowDelayMs(row, numRows, isTurbo);
 
         const tweens: any[] = [
           {
@@ -5731,7 +5732,7 @@ export class Symbols {
             const baseDelay = isTurbo ? colDelay * 0.4 : colDelay;
             // Per-symbol stagger for "existing symbols" should be based on the packed stack,
             // not absolute grid row (most symbols end up near bottom, making grid-based delay imperceptible).
-            const rowDelay = this.getDropPerSymbolStaggerMs() * Math.max(0, (kept.length - 1) - idx);
+            const rowDelay = this.getDropPerSymbolStaggerMs(isTurbo) * Math.max(0, (kept.length - 1) - idx);
             const delay = baseDelay + rowDelay;
 
             // Scale duration by how far this symbol actually needs to fall.
@@ -5873,7 +5874,7 @@ export class Symbols {
               const computedStartDelay =
                 tumbleTimingSnapshot.tumbleDropStartDelayMs
                 + (DROP_STAGGER_MS * col)
-                + this.getBottomFirstRowDelayMs(targetRow, numRows);
+                + this.getBottomFirstRowDelayMs(targetRow, numRows, isTurbo);
               const skipPreHop = tumbleTimingSnapshot.tumbleSkipPreHop;
               const tweensArr: any[] = [];
               if (!skipPreHop) {
@@ -6040,7 +6041,7 @@ export class Symbols {
               const computedStartDelay =
                 tumbleTimingSnapshot.tumbleDropStartDelayMs
                 + (DROP_STAGGER_MS * col)
-                + this.getBottomFirstRowDelayMs(targetRow, numRows);
+                + this.getBottomFirstRowDelayMs(targetRow, numRows, isTurbo);
               const skipPreHop = tumbleTimingSnapshot.tumbleSkipPreHop;
               const tweensArr: any[] = [];
               if (!skipPreHop) {
