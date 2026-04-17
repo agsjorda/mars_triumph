@@ -91,11 +91,19 @@ export const DROP_ANIMATION_SPEED_MULTIPLIER: number = 0.6;
  */
 export const DROP_OVERSHOOT_OFFSET_PX: number = 10;
 
+/**
+ * Extra speed multiplier for tumble "existing symbols" filling gaps (compression move).
+ * Lower = faster. Keep separate so you can tune without affecting new-symbol drops.
+ */
+export const TUMBLE_EXISTING_DROP_SPEED_MULTIPLIER: number = 0.35;
+
 export const TIMING_CONFIG = {
   /** Extended duration for scatter anticipation (ms) */
   EXTEND_DURATION_MS: 3000,
   /** Stagger delay between symbols within a column (ms) */
-  SYMBOL_STAGGER_MS: 100,
+  SYMBOL_STAGGER_MS: 300,
+  /** Extra per-symbol (row) stagger for drop tweens within a single column (ms) */
+  DROP_SYMBOL_STAGGER_MS: 30,
   /** Stagger delay between columns (ms) */
   COLUMN_STAGGER_MS: 50,
   /** Win dialog auto-close delay (ms) */

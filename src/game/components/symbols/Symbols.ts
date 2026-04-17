@@ -25,7 +25,7 @@ import { SymbolDetector } from '../../../tmp_backend/SymbolDetector';
 import { gameEventManager, GameEventType } from '../../../event/EventManager';
 import { gameStateManager } from '../../../managers/GameStateManager';
 import { TurboConfig } from '../../../config/TurboConfig';
-import { SLOT_ROWS, SLOT_COLUMNS, DELAY_BETWEEN_SPINS, MULTIPLIER_SYMBOLS, MIN_CLUSTER_SIZE, DROP_ANIMATION_SPEED_MULTIPLIER, DROP_OVERSHOOT_OFFSET_PX } from '../../../config/GameConfig';
+import { SLOT_ROWS, SLOT_COLUMNS, DELAY_BETWEEN_SPINS, MULTIPLIER_SYMBOLS, MIN_CLUSTER_SIZE, DROP_ANIMATION_SPEED_MULTIPLIER, DROP_OVERSHOOT_OFFSET_PX, TUMBLE_EXISTING_DROP_SPEED_MULTIPLIER, TIMING_CONFIG } from '../../../config/GameConfig';
 import { SoundEffectType } from '../../../managers/AudioManager';
 
 // Import new modular components
@@ -134,6 +134,27 @@ export class Symbols {
   public symbolDetector: SymbolDetector;
   public currentSpinData: any = null;
   public isBuyFeatureTransitionComplete: boolean = false;
+
+  // ============================================================================
+  // DROP / TUMBLE TIMING HELPERS
+  // ============================================================================
+
+  private getDropOvershootPx(): number {
+    return Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+  }
+
+  private getDropPerSymbolStaggerMs(): number {
+    return Math.max(0, Number(TIMING_CONFIG.DROP_SYMBOL_STAGGER_MS ?? 0) || 0);
+  }
+
+  /** Bottom-first row delay: bottom row starts first, top row starts last. */
+  private getBottomFirstRowDelayMs(row: number, totalRows: number): number {
+    const perSymbolStagger = this.getDropPerSymbolStaggerMs();
+    if (perSymbolStagger <= 0) return 0;
+    const clampedTotal = Math.max(1, Number(totalRows) || 1);
+    const clampedRow = Math.max(0, Math.min(clampedTotal - 1, Number(row) || 0));
+    return perSymbolStagger * ((clampedTotal - 1) - clampedRow);
+  }
 
   // Expose grid properties for backward compatibility
   public get container(): Phaser.GameObjects.Container {
@@ -3933,7 +3954,7 @@ export class Symbols {
 
       let completedAnimations = 0;
       const totalAnimations = this.symbols.length;
-      const STAGGER_MS = 100; // Same as new symbols
+      const STAGGER_MS = TIMING_CONFIG.COLUMN_STAGGER_MS; // per-column stagger (ms)
       const symbolHop = this.scene.gameData.winUpHeight * 0.5;
       const isTurbo = typeof turboOverride === 'boolean'
         ? turboOverride
@@ -4021,8 +4042,8 @@ export class Symbols {
         }
 
         const tweenTargets: any = overlayObj ? [baseObj, overlayObj] : baseObj;
-        // warfreaks-style reel drop: no per-column stagger (all columns move together).
-        const delayMs = 0;
+        // Per-column stagger + optional per-symbol stagger (same rowIndex across columns).
+        const delayMs = Math.max(0, STAGGER_MS * col) + (this.getDropPerSymbolStaggerMs() * rowIndex);
 
         if (delayMs > 0) {
           this.scene.time.delayedCall(delayMs, () => {
@@ -4194,9 +4215,11 @@ export class Symbols {
           if (overlayObj) this.scene.tweens.killTweensOf(overlayObj);
         } catch { }
 
+        const rowDelay = this.getBottomFirstRowDelayMs(row, col.length);
+
         const tweens: any[] = [
           {
-            delay: 0,
+            delay: rowDelay,
             y: `-= ${symbolHop}`,
             duration: Math.max(1, winUpDuration * speed),
             ease: Phaser.Math.Easing.Circular.Out,
@@ -4263,7 +4286,7 @@ export class Symbols {
 
       let completedAnimations = 0;
       const totalAnimations = this.newSymbols.length;
-      const STAGGER_MS = 100;
+      const STAGGER_MS = TIMING_CONFIG.COLUMN_STAGGER_MS; // per-column stagger (ms)
       const symbolHop = this.scene.gameData.winUpHeight * 0.5;
       const isTurbo = typeof turboOverride === 'boolean'
         ? turboOverride
@@ -4316,7 +4339,7 @@ export class Symbols {
         ];
 
         if (!isTurbo && !isSkip) {
-          const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+          const overshoot = this.getDropOvershootPx();
           if (overshoot > 0) {
             // Overshoot past the target (down), then settle back to target.
             tweens.push(
@@ -4418,7 +4441,8 @@ export class Symbols {
         const baseObj: any = symbol as any;
         const overlayObj: any = (baseObj as any)?.__overlayImage;
         const tweenTargets: any = overlayObj ? [baseObj, overlayObj] : baseObj;
-        const delayMs = 0;
+        // Optional per-symbol stagger within the column (bottom starts first).
+        const delayMs = this.getBottomFirstRowDelayMs(row, numRows);
 
         const tweens: any[] = [
           {
@@ -4446,7 +4470,7 @@ export class Symbols {
         };
 
         if (!isTurbo && !isSkip) {
-          const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+          const overshoot = this.getDropOvershootPx();
           if (overshoot > 0) {
             tweens.push(
               { y: `+= ${overshoot}`, duration: Math.max(1, dropDuration * 0.05 * speed), ease: Phaser.Math.Easing.Linear },
@@ -5364,7 +5388,7 @@ export class Symbols {
 
     // Animate removal: for high-count sugar symbols (1..9), play SW_Win before destroy; otherwise fade out
     const removalPromises: Promise<void>[] = [];
-    const STAGGER_MS = 50; // match drop sequence stagger (shortened)
+    const STAGGER_MS = TIMING_CONFIG.COLUMN_STAGGER_MS; // per-column stagger (ms)
     // Track first win animation notification (we now trigger on animation start for better SFX sync)
     let firstWinNotified = false;
     let explosionSfxPlayed = false;
@@ -5697,24 +5721,67 @@ export class Symbols {
             const tweenTargetsMove: any = this.getSymbolTweenTargets(obj);
             const isTurbo = tumbleTurboSnapshot;
             const baseDuration = tumbleTimingSnapshot.dropDuration;
-            // Use a slightly shorter duration in turbo, but long enough for easing
-            // to be visible so the motion doesn't feel rigid.
-            const compressionDuration = isTurbo
-              ? Math.max(160, baseDuration * 0.6)
-              : baseDuration;
+            // Match new-symbol drop *speed* (px/ms), not a fixed duration.
+            // New tumble drops use ~0.9 of dropDuration to travel ~1 cell.
+            const existingDropSpeed = Math.max(0.05, Number(TUMBLE_EXISTING_DROP_SPEED_MULTIPLIER ?? 1) || 1);
+            const perCellDropDuration = Math.max(1, baseDuration * 0.9 * existingDropSpeed);
             const baseDelayMultiplier = tumbleTimingSnapshot.compressionDelayMultiplier;
             const colDelay = STAGGER_MS * col * baseDelayMultiplier;
             // In turbo, keep some stagger but reduce it so columns still feel snappy.
-            const delay = isTurbo ? colDelay * 0.4 : colDelay;
-            self.scene.tweens.add({
-              targets: tweenTargetsMove,
-              y: targetY,
-              delay,
-              duration: compressionDuration,
-              // Keep tumble compression smooth without "bounce" (overshoot happens on the drop settle).
-              ease: Phaser.Math.Easing.Cubic.Out,
-              onComplete: () => resolve(),
-            });
+            const baseDelay = isTurbo ? colDelay * 0.4 : colDelay;
+            // Per-symbol stagger for "existing symbols" should be based on the packed stack,
+            // not absolute grid row (most symbols end up near bottom, making grid-based delay imperceptible).
+            const rowDelay = this.getDropPerSymbolStaggerMs() * Math.max(0, (kept.length - 1) - idx);
+            const delay = baseDelay + rowDelay;
+
+            // Scale duration by how far this symbol actually needs to fall.
+            // This keeps the visual fall speed consistent with new symbol drops.
+            const currentY =
+              (typeof (obj as any)?.y === 'number')
+                ? Number((obj as any).y)
+                : (typeof (obj as any)?.getY === 'function' ? Number((obj as any).getY()) : targetY);
+            const distancePx = Math.max(0, Number(targetY) - Number(currentY));
+            const cellsToTravel = Math.max(0.01, distancePx / symbolTotalHeight);
+            // New symbols can travel far (off-screen) but still use a mostly fixed duration,
+            // which makes them feel "fast". Mirror that by clamping long travel to 1 cell's duration,
+            // while still shortening very small moves.
+            const travelScale = Math.min(1, Math.max(0.2, cellsToTravel));
+            const dropDurationMs = Math.max(1, perCellDropDuration * travelScale);
+
+            const tweensArr: any[] = [
+              {
+                delay,
+                y: targetY,
+                duration: dropDurationMs,
+                ease: isTurbo ? Phaser.Math.Easing.Cubic.Out : Phaser.Math.Easing.Linear,
+              },
+            ];
+
+            if (!isTurbo) {
+          const overshoot = this.getDropOvershootPx();
+              if (overshoot > 0) {
+                tweensArr.push(
+                  { y: `+= ${overshoot}`, duration: Math.max(1, baseDuration * 0.05), ease: Phaser.Math.Easing.Linear },
+                  { y: `-= ${overshoot}`, duration: Math.max(1, baseDuration * 0.05), ease: Phaser.Math.Easing.Linear, onComplete: () => resolve() },
+                );
+              } else {
+                const last = tweensArr[tweensArr.length - 1];
+                const prevOnComplete = last.onComplete;
+                last.onComplete = () => {
+                  try { if (prevOnComplete) prevOnComplete(); } catch { }
+                  resolve();
+                };
+              }
+            } else {
+              const last = tweensArr[tweensArr.length - 1];
+              const prevOnComplete = last.onComplete;
+              last.onComplete = () => {
+                try { if (prevOnComplete) prevOnComplete(); } catch { }
+                resolve();
+              };
+            }
+
+            self.scene.tweens.chain({ targets: tweenTargetsMove, tweens: tweensArr });
           } catch { resolve(); }
         }));
       });
@@ -5803,7 +5870,10 @@ export class Symbols {
               return;
             }
             try {
-              const computedStartDelay = tumbleTimingSnapshot.tumbleDropStartDelayMs + (DROP_STAGGER_MS * col);
+              const computedStartDelay =
+                tumbleTimingSnapshot.tumbleDropStartDelayMs
+                + (DROP_STAGGER_MS * col)
+                + this.getBottomFirstRowDelayMs(targetRow, numRows);
               const skipPreHop = tumbleTimingSnapshot.tumbleSkipPreHop;
               const tweensArr: any[] = [];
               if (!skipPreHop) {
@@ -5840,7 +5910,7 @@ export class Symbols {
               }
               if (!isTurbo) {
                 // Normal mode: overshoot past the target, then settle back.
-                const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+                const overshoot = this.getDropOvershootPx();
                 if (overshoot > 0) {
                   tweensArr.push(
                     {
@@ -5967,7 +6037,10 @@ export class Symbols {
               return;
             }
             try {
-              const computedStartDelay = tumbleTimingSnapshot.tumbleDropStartDelayMs + (DROP_STAGGER_MS * col);
+              const computedStartDelay =
+                tumbleTimingSnapshot.tumbleDropStartDelayMs
+                + (DROP_STAGGER_MS * col)
+                + this.getBottomFirstRowDelayMs(targetRow, numRows);
               const skipPreHop = tumbleTimingSnapshot.tumbleSkipPreHop;
               const tweensArr: any[] = [];
               if (!skipPreHop) {
@@ -5999,7 +6072,7 @@ export class Symbols {
               }
               if (!isTurbo) {
                 // Normal mode: overshoot past the target, then settle back.
-                const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+                const overshoot = this.getDropOvershootPx();
                 if (overshoot > 0) {
                   tweensArr.push(
                     { y: `+= ${overshoot}`, duration: tumbleTimingSnapshot.dropDuration * 0.05, ease: Phaser.Math.Easing.Linear },

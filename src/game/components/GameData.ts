@@ -67,6 +67,9 @@ export function setSpeed(data: GameData, DELAY_BETWEEN_SPINS: number) {
 	data.dropDuration = DELAY_BETWEEN_SPINS * 0.4 * DROP_RESET_TIME_MULTIPLIER * dropSpeed;
 	data.dropReelsDelay = DELAY_BETWEEN_SPINS * DROP_REEL_START_INTERVAL_RATIO;
 	data.dropReelsDuration = DELAY_BETWEEN_SPINS * 0.4 * DROP_RESET_TIME_MULTIPLIER * dropSpeed;
+
+	// Keep tumble staggering in sync with config (useful for hot reload / tuning).
+	data.tumbleStaggerMs = TIMING_CONFIG.SYMBOL_STAGGER_MS * 1;
 }
 
 /**
