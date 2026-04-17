@@ -25,7 +25,7 @@ import { SymbolDetector } from '../../../tmp_backend/SymbolDetector';
 import { gameEventManager, GameEventType } from '../../../event/EventManager';
 import { gameStateManager } from '../../../managers/GameStateManager';
 import { TurboConfig } from '../../../config/TurboConfig';
-import { SLOT_ROWS, SLOT_COLUMNS, DELAY_BETWEEN_SPINS, MULTIPLIER_SYMBOLS, MIN_CLUSTER_SIZE } from '../../../config/GameConfig';
+import { SLOT_ROWS, SLOT_COLUMNS, DELAY_BETWEEN_SPINS, MULTIPLIER_SYMBOLS, MIN_CLUSTER_SIZE, DROP_ANIMATION_SPEED_MULTIPLIER } from '../../../config/GameConfig';
 import { SoundEffectType } from '../../../managers/AudioManager';
 
 // Import new modular components
@@ -3680,7 +3680,9 @@ export class Symbols {
     const isTurbo = !!this.scene.gameData?.isTurbo;
     const dropTimingSnapshot: ReelDropTimingSnapshot = {
       winUpDuration: Number(this.scene.gameData?.winUpDuration ?? 0),
-      dropDuration: Number(this.scene.gameData?.dropDuration ?? 0),
+      dropDuration:
+        Number(this.scene.gameData?.dropDuration ?? 0) *
+        Math.max(0.05, Number(DROP_ANIMATION_SPEED_MULTIPLIER ?? 1) || 1),
       dropReelsDelay: Number(this.scene.gameData?.dropReelsDelay ?? 0),
     };
 

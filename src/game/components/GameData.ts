@@ -1,6 +1,6 @@
 // BackendEvent import removed - no longer needed in this file
 
-import { DROP_REEL_START_INTERVAL_RATIO, TIMING_CONFIG, ANIMATION_CONFIG } from '../../config/GameConfig';
+import { DROP_ANIMATION_SPEED_MULTIPLIER, DROP_REEL_START_INTERVAL_RATIO, TIMING_CONFIG, ANIMATION_CONFIG } from '../../config/GameConfig';
 import { Logger } from '../../utils/Logger';
 
 /**
@@ -62,9 +62,11 @@ export const DROP_RESET_TIME_MULTIPLIER: number = 0.8;
 export function setSpeed(data: GameData, DELAY_BETWEEN_SPINS: number) {
 	// Apply global multiplier to win-up (reset) and drop durations
 	data.winUpDuration = DELAY_BETWEEN_SPINS * 0.1 * DROP_RESET_TIME_MULTIPLIER;
-	data.dropDuration = DELAY_BETWEEN_SPINS * 0.4 * DROP_RESET_TIME_MULTIPLIER;
+	// Preserve per-column stagger (dropReelsDelay) but allow tuning drop speed independently.
+	const dropSpeed = Math.max(0.05, Number(DROP_ANIMATION_SPEED_MULTIPLIER ?? 1) || 1);
+	data.dropDuration = DELAY_BETWEEN_SPINS * 0.4 * DROP_RESET_TIME_MULTIPLIER * dropSpeed;
 	data.dropReelsDelay = DELAY_BETWEEN_SPINS * DROP_REEL_START_INTERVAL_RATIO;
-	data.dropReelsDuration = DELAY_BETWEEN_SPINS * 0.4 * DROP_RESET_TIME_MULTIPLIER;
+	data.dropReelsDuration = DELAY_BETWEEN_SPINS * 0.4 * DROP_RESET_TIME_MULTIPLIER * dropSpeed;
 }
 
 /**

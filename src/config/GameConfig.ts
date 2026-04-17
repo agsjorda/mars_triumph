@@ -74,7 +74,16 @@ export const SYMBOL_CONFIG = {
 // =============================================================================
 export const DELAY_BETWEEN_SPINS: number = 3000;
 /** Ratio for time between column starts relative to DELAY_BETWEEN_SPINS */
-export const DROP_REEL_START_INTERVAL_RATIO: number = 0.08;
+export const DROP_REEL_START_INTERVAL_RATIO: number = 0.04;
+
+/**
+ * Drop animation speed multiplier (pre-spin clear + new-symbol drops).
+ * - Lower than 1.0 = faster drops
+ * - Higher than 1.0 = slower drops
+ *
+ * This intentionally does NOT affect per-column staggering (`DROP_REEL_START_INTERVAL_RATIO`).
+ */
+export const DROP_ANIMATION_SPEED_MULTIPLIER: number = 0.6;
 
 export const TIMING_CONFIG = {
   /** Extended duration for scatter anticipation (ms) */
