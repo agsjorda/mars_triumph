@@ -14,6 +14,7 @@ import { gameStateManager } from "../../managers/GameStateManager";
 import { ensureSpineFactory } from "../../utils/SpineGuard";
 import { CurrencyManager } from "./CurrencyManager";
 import { formatCurrencyNumber } from "../../utils/NumberPrecisionFormatter";
+import { DEFAULT_BASE_BET, DEFAULT_BET_LEVEL_INDEX } from "./controller";
 
 export interface AutoplayOptionsConfig {
 	position?: { x: number; y: number };
@@ -51,7 +52,7 @@ export class AutoplayOptions {
 	private networkManager: NetworkManager;
 	private screenModeManager: ScreenModeManager;
 	private currentAutoplayCount: number = 10;
-	private currentBet: number = 0.20; // Default bet amount (base bet)
+	private currentBet: number = DEFAULT_BASE_BET;
 	private currentBalance: number = 0; // Current game balance
 	private betDisplayMultiplier: number = 1;
 	private isEnhancedBet: boolean = false;
@@ -126,8 +127,11 @@ export class AutoplayOptions {
 		const levels = (scene as any).gameData?.betLevels;
 		if (Array.isArray(levels) && levels.length > 0) {
 			this.betOptions = levels;
-			if (!Number.isFinite(this.currentBet) || Math.abs(this.currentBet - 0.20) < 0.0001) {
-				this.currentBet = levels[0];
+			const defaultBet = !Number.isFinite(this.currentBet) || Math.abs(this.currentBet - DEFAULT_BASE_BET) < 0.0001;
+			const idx = DEFAULT_BET_LEVEL_INDEX;
+			const fallbackIdx = Math.max(0, Math.min(levels.length - 1, idx));
+			if (defaultBet) {
+				this.currentBet = Number(levels[fallbackIdx]);
 			}
 		}
 	}

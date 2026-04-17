@@ -15,6 +15,7 @@ import { Scene } from 'phaser';
 import { Background } from '../components/Background';
 import { Header } from '../components/Header';
 import { SlotController } from '../components/controller/SlotController';
+import { DEFAULT_BASE_BET, DEFAULT_BET_LEVEL_INDEX } from '../components/controller';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { NetworkManager } from '../../managers/NetworkManager';
 import { ScreenModeManager } from '../../managers/ScreenModeManager';
@@ -588,7 +589,7 @@ export class Game extends Scene {
 
 			// Use base bet for selection; derive display bet numerically so commas in HUD text
 			// cannot corrupt the amplify multiplier (e.g. parseFloat("1,250.00") -> 1).
-			const currentBaseBet = this.slotController.getBaseBetAmount() || 0.20;
+			const currentBaseBet = this.slotController.getBaseBetAmount() || DEFAULT_BASE_BET;
 			const isEnhancedBet = this.gameData?.isEnhancedBet === true;
 			const betDisplayMultiplier = isEnhancedBet ? 1.25 : 1;
 			const currentDisplayBet = currentBaseBet * betDisplayMultiplier;
@@ -613,7 +614,7 @@ export class Game extends Scene {
 		EventBus.on('amplify', (isEnhanced: boolean) => {
 			try {
 				if (this.betOptions && this.betOptions.isVisible()) {
-					const baseBet = this.slotController.getBaseBetAmount() || 0.20;
+					const baseBet = this.slotController.getBaseBetAmount() || DEFAULT_BASE_BET;
 					const displayBet = baseBet * (isEnhanced ? 1.25 : 1);
 					this.betOptions.setEnhancedBetState(!!isEnhanced, displayBet, baseBet);
 				}
@@ -625,7 +626,7 @@ export class Game extends Scene {
 			console.log('[Game] Autoplay button clicked - showing options');
 
 			// Use base bet as source of truth; display value is derived via isEnhancedBet.
-			const currentBaseBet = this.slotController.getBaseBetAmount() || 0.20;
+			const currentBaseBet = this.slotController.getBaseBetAmount() || DEFAULT_BASE_BET;
 			const currentDisplayText = this.slotController.getBetAmountText();
 			const currentDisplayBet = currentDisplayText ? parseFloat(currentDisplayText) : currentBaseBet;
 
@@ -905,11 +906,17 @@ export class Game extends Scene {
 
 	private initializeBetAmoung() {
 		try {
-			const firstBet = this.gameData.betLevels.length > 0
-				? Number(this.gameData.betLevels[0])
-				: 0.20;
+			const levels = this.gameData.betLevels;
+			const fallbackBet =
+				Array.isArray(levels) && levels.length > DEFAULT_BET_LEVEL_INDEX
+					? Number(levels[DEFAULT_BET_LEVEL_INDEX])
+					: DEFAULT_BASE_BET;
+			const firstBet =
+				Array.isArray(levels) && levels.length > DEFAULT_BET_LEVEL_INDEX
+					? Number(levels[DEFAULT_BET_LEVEL_INDEX])
+					: fallbackBet;
 
-			const previousBet = this.slotController?.getBaseBetAmount?.() ?? 0.20;
+			const previousBet = this.slotController?.getBaseBetAmount?.() ?? DEFAULT_BASE_BET;
 
 			if (this.slotController) {
 				this.slotController.updateBetAmount(firstBet);
@@ -938,7 +945,7 @@ export class Game extends Scene {
 			return false;
 		}
 
-		const previousBet = this.slotController.getBaseBetAmount?.() ?? 0.20;
+		const previousBet = this.slotController.getBaseBetAmount?.() ?? DEFAULT_BASE_BET;
 		this.slotController.updateBetAmount(unresolvedBet);
 		this.betOptions?.setCurrentBet?.(unresolvedBet);
 		this.autoplayOptions?.setCurrentBet?.(unresolvedBet);

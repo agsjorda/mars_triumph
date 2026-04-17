@@ -12,6 +12,7 @@ import {
 	COMMON_BET,
 	LOCALIZATION_DEFAULTS,
 } from '../../backend/LocalizationData';
+import { DEFAULT_BASE_BET, DEFAULT_BET_LEVEL_INDEX } from './controller';
 
 export interface BuyFeatureConfig {
 	position?: { x: number; y: number };
@@ -29,7 +30,7 @@ export class BuyFeature {
 	private readonly DISABLED_ALPHA: number = 0.5;
 	private balanceEventUnsubs: (() => void)[] = [];
 	private featurePrice: number = 24000.00;
-	private currentBet: number = 0.2; // Start with first bet option
+	private currentBet: number = DEFAULT_BASE_BET;
 	private slotController: SlotController | null = null;
 	private readonly BET_MULTIPLIER: number = 100; // Multiplier for price display
 	private betOptions: number[] = [
@@ -40,7 +41,7 @@ export class BuyFeature {
 		32, 40, 60, 80, 100,
 		110, 120, 130, 140, 150
 	];
-	private currentBetIndex: number = 0; // Index in betOptions array
+	private currentBetIndex: number = DEFAULT_BET_LEVEL_INDEX; // Index in betOptions array
 	private closeButton!: Phaser.GameObjects.Text;
 	private confirmButton!: Phaser.GameObjects.Text;
 	private betDisplay!: Phaser.GameObjects.Text;
@@ -66,11 +67,12 @@ export class BuyFeature {
 		const levels = (scene as any).gameData?.betLevels;
 		if (Array.isArray(levels) && levels.length > 0) {
 			this.betOptions = levels;
-			const defaultBet = Math.abs(this.currentBet - 0.2) < 0.0001;
+			const defaultBet = Math.abs(this.currentBet - DEFAULT_BASE_BET) < 0.0001;
 			const idxInNew = this.betOptions.findIndex(v => Math.abs(v - this.currentBet) < 0.0001);
 			if (!Number.isFinite(this.currentBet) || defaultBet || idxInNew === -1) {
-				this.currentBetIndex = 0;
-				this.currentBet = Number(this.betOptions[0]);
+				const idx = Math.max(0, Math.min(this.betOptions.length - 1, DEFAULT_BET_LEVEL_INDEX));
+				this.currentBetIndex = idx;
+				this.currentBet = Number(this.betOptions[idx]);
 			} else {
 				this.currentBetIndex = idxInNew;
 			}

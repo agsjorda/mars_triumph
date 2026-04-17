@@ -30,7 +30,8 @@ import {
 import { 
 	BetController, 
 	AutoplayController, 
-	SpinButtonController 
+	SpinButtonController,
+	DEFAULT_BASE_BET,
 } from './index';
 
 export class SlotController {
@@ -60,7 +61,7 @@ export class SlotController {
 	private autoplayStopIcon!: Phaser.GameObjects.Image;
 	private autoplayButtonAnimation: any = null;
 	private autoplaySpinsRemainingText!: Phaser.GameObjects.Text;
-	private baseBetAmount: number = 0.2;
+	private baseBetAmount: number = DEFAULT_BASE_BET;
 	private betAmountText!: Phaser.GameObjects.Text;
 	private betDollarText!: Phaser.GameObjects.Text;
 	private betLabelContainer!: Phaser.GameObjects.Container;
@@ -1112,7 +1113,7 @@ export class SlotController {
 			this.betController.enableBetButtons();
 		}
 		// Apply limit states for legacy buttons (or as a fallback)
-		const currentBaseBet = this.getBaseBetAmount() || 0.2;
+		const currentBaseBet = this.getBaseBetAmount() || DEFAULT_BASE_BET;
 		this.updateBetLimitButtons(currentBaseBet);
 	}
 
@@ -1803,7 +1804,7 @@ export class SlotController {
 		this.betAmountText = scene.add.text(
 			betX,
 			betY + 8,
-			'0.20',
+			formatCurrencyNumber(DEFAULT_BASE_BET),
 			{
 				fontSize: '14px',
 				color: '#ffffff', // White color
@@ -1851,7 +1852,7 @@ export class SlotController {
 		});
 
 		// Initialize base bet amount
-		this.baseBetAmount = 0.20;
+		this.baseBetAmount = DEFAULT_BASE_BET;
 
 		// Hide old currency text (kept for compatibility but not visible)
 		this.betDollarText = scene.add.text(
@@ -3764,7 +3765,7 @@ export class SlotController {
 		}
 
 		// Apply min/max greying based on the current base bet after bonus ends
-		const currentBaseBet = this.getBaseBetAmount() || 0.2;
+		const currentBaseBet = this.getBaseBetAmount() || DEFAULT_BASE_BET;
 		this.updateBetLimitButtons(currentBaseBet);
 		
 		// Hide the free spin display when bonus mode ends
