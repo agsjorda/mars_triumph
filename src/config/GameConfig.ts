@@ -85,6 +85,12 @@ export const DROP_REEL_START_INTERVAL_RATIO: number = 0.04;
  */
 export const DROP_ANIMATION_SPEED_MULTIPLIER: number = 0.6;
 
+/**
+ * Post-drop overshoot distance (px) for non-turbo symbol drops.
+ * The drop will go past the target by this many pixels, then settle back to the target.
+ */
+export const DROP_OVERSHOOT_OFFSET_PX: number = 10;
+
 export const TIMING_CONFIG = {
   /** Extended duration for scatter anticipation (ms) */
   EXTEND_DURATION_MS: 3000,

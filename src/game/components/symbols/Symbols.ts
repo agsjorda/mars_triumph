@@ -25,7 +25,7 @@ import { SymbolDetector } from '../../../tmp_backend/SymbolDetector';
 import { gameEventManager, GameEventType } from '../../../event/EventManager';
 import { gameStateManager } from '../../../managers/GameStateManager';
 import { TurboConfig } from '../../../config/TurboConfig';
-import { SLOT_ROWS, SLOT_COLUMNS, DELAY_BETWEEN_SPINS, MULTIPLIER_SYMBOLS, MIN_CLUSTER_SIZE, DROP_ANIMATION_SPEED_MULTIPLIER } from '../../../config/GameConfig';
+import { SLOT_ROWS, SLOT_COLUMNS, DELAY_BETWEEN_SPINS, MULTIPLIER_SYMBOLS, MIN_CLUSTER_SIZE, DROP_ANIMATION_SPEED_MULTIPLIER, DROP_OVERSHOOT_OFFSET_PX } from '../../../config/GameConfig';
 import { SoundEffectType } from '../../../managers/AudioManager';
 
 // Import new modular components
@@ -4316,24 +4316,39 @@ export class Symbols {
         ];
 
         if (!isTurbo && !isSkip) {
-          tweens.push(
-            {
-              y: `+= ${10}`,
-              duration: Math.max(1, dropDuration * 0.05 * speed),
-              ease: Phaser.Math.Easing.Linear,
-            },
-            {
-              y: `-= ${10}`,
-              duration: Math.max(1, dropDuration * 0.05 * speed),
-              ease: Phaser.Math.Easing.Linear,
-              onComplete: () => {
-                completedAnimations++;
-                if (completedAnimations === totalAnimations) {
-                  resolve();
+          const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+          if (overshoot > 0) {
+            // Overshoot past the target (down), then settle back to target.
+            tweens.push(
+              {
+                y: `+= ${overshoot}`,
+                duration: Math.max(1, dropDuration * 0.05 * speed),
+                ease: Phaser.Math.Easing.Linear,
+              },
+              {
+                y: `-= ${overshoot}`,
+                duration: Math.max(1, dropDuration * 0.05 * speed),
+                ease: Phaser.Math.Easing.Linear,
+                onComplete: () => {
+                  completedAnimations++;
+                  if (completedAnimations === totalAnimations) {
+                    resolve();
+                  }
                 }
+              },
+            );
+          } else {
+            // No overshoot; resolve on the main drop completion.
+            const last = tweens[tweens.length - 1];
+            const prevOnComplete = last.onComplete;
+            last.onComplete = () => {
+              try { if (prevOnComplete) prevOnComplete(); } catch { }
+              completedAnimations++;
+              if (completedAnimations === totalAnimations) {
+                resolve();
               }
-            },
-          );
+            };
+          }
         } else {
           const last = tweens[tweens.length - 1];
           const prevOnComplete = last.onComplete;
@@ -4431,10 +4446,20 @@ export class Symbols {
         };
 
         if (!isTurbo && !isSkip) {
-          tweens.push(
-            { y: `+= ${10}`, duration: Math.max(1, dropDuration * 0.05 * speed), ease: Phaser.Math.Easing.Linear },
-            { y: `-= ${10}`, duration: Math.max(1, dropDuration * 0.05 * speed), ease: Phaser.Math.Easing.Linear, onComplete: finalize },
-          );
+          const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+          if (overshoot > 0) {
+            tweens.push(
+              { y: `+= ${overshoot}`, duration: Math.max(1, dropDuration * 0.05 * speed), ease: Phaser.Math.Easing.Linear },
+              { y: `-= ${overshoot}`, duration: Math.max(1, dropDuration * 0.05 * speed), ease: Phaser.Math.Easing.Linear, onComplete: finalize },
+            );
+          } else {
+            const last = tweens[tweens.length - 1];
+            const prevOnComplete = last.onComplete;
+            last.onComplete = () => {
+              try { if (prevOnComplete) prevOnComplete(); } catch { }
+              finalize();
+            };
+          }
         } else {
           const last = tweens[tweens.length - 1];
           const prevOnComplete = last.onComplete;
@@ -5686,10 +5711,8 @@ export class Symbols {
               y: targetY,
               delay,
               duration: compressionDuration,
-              // In turbo mode, keep motion snappy but smoothly decelerating
-              ease: tumbleTurboSnapshot
-                ? Phaser.Math.Easing.Cubic.Out
-                : Phaser.Math.Easing.Bounce.Out,
+              // Keep tumble compression smooth without "bounce" (overshoot happens on the drop settle).
+              ease: Phaser.Math.Easing.Cubic.Out,
               onComplete: () => resolve(),
             });
           } catch { resolve(); }
@@ -5816,20 +5839,30 @@ export class Symbols {
                 });
               }
               if (!isTurbo) {
-                // Normal mode: include the small post-drop bounce and SFX
-                tweensArr.push(
-                  {
-                    y: `+= ${10}`,
-                    duration: tumbleTimingSnapshot.dropDuration * 0.05,
-                    ease: Phaser.Math.Easing.Linear,
-                  },
-                  {
-                    y: `-= ${10}`,
-                    duration: tumbleTimingSnapshot.dropDuration * 0.05,
-                    ease: Phaser.Math.Easing.Linear,
-                    onComplete: () => { resolve(); }
-                  }
-                );
+                // Normal mode: overshoot past the target, then settle back.
+                const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+                if (overshoot > 0) {
+                  tweensArr.push(
+                    {
+                      y: `+= ${overshoot}`,
+                      duration: tumbleTimingSnapshot.dropDuration * 0.05,
+                      ease: Phaser.Math.Easing.Linear,
+                    },
+                    {
+                      y: `-= ${overshoot}`,
+                      duration: tumbleTimingSnapshot.dropDuration * 0.05,
+                      ease: Phaser.Math.Easing.Linear,
+                      onComplete: () => { resolve(); }
+                    }
+                  );
+                } else {
+                  const last = tweensArr[tweensArr.length - 1];
+                  const prevOnComplete = last.onComplete;
+                  last.onComplete = () => {
+                    try { if (prevOnComplete) prevOnComplete(); } catch {}
+                    resolve();
+                  };
+                }
               } else {
                 // Turbo mode: no post-drop bounce; resolve on the main drop completion
                 const last = tweensArr[tweensArr.length - 1];
@@ -5965,16 +5998,28 @@ export class Symbols {
                 });
               }
               if (!isTurbo) {
-                // Normal mode: include the small post-drop bounce and SFX
-                tweensArr.push(
-                  { y: `+= ${10}`, duration: tumbleTimingSnapshot.dropDuration * 0.05, ease: Phaser.Math.Easing.Linear },
-                  {
-                    y: `-= ${10}`,
-                    duration: tumbleTimingSnapshot.dropDuration * 0.05,
-                    ease: Phaser.Math.Easing.Linear,
-                    onComplete: () => { resolve(); }
-                  }
-                );
+                // Normal mode: overshoot past the target, then settle back.
+                const overshoot = Math.max(0, Number(DROP_OVERSHOOT_OFFSET_PX ?? 0) || 0);
+                if (overshoot > 0) {
+                  tweensArr.push(
+                    { y: `+= ${overshoot}`, duration: tumbleTimingSnapshot.dropDuration * 0.05, ease: Phaser.Math.Easing.Linear },
+                    {
+                      y: `-= ${overshoot}`,
+                      duration: tumbleTimingSnapshot.dropDuration * 0.05,
+                      ease: Phaser.Math.Easing.Linear,
+                      onComplete: () => { resolve(); }
+                    }
+                  );
+                } else {
+                  const last = tweensArr[tweensArr.length - 1];
+                  const prevOnComplete = last.onComplete;
+                  last.onComplete = () => {
+                    try { if (prevOnComplete) prevOnComplete(); } catch (e) {
+                      console.warn('[Symbols] Error in tween onComplete:', e);
+                    }
+                    resolve();
+                  };
+                }
               } else {
                 // Turbo mode: no post-drop bounce; resolve on the main drop completion
                 const last = tweensArr[tweensArr.length - 1];
