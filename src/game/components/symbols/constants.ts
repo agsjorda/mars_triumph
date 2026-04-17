@@ -84,7 +84,7 @@ export const OVERLAY_FADE_OUT_DURATION_MS = 200;
  * These values are manually tuned for visual appearance
  */
 export const SPINE_SYMBOL_SCALES: Record<number, number> = {
-  0: 0.535,   // Scatter symbol scale
+  0: 0.8,   // Scatter symbol scale
   1: 0.035,   // Sugar symbol 1 scale
   2: 0.035,   // Sugar symbol 2 scale
   3: 0.035,   // Sugar symbol 3 scale
@@ -120,7 +120,7 @@ export const SCATTER_GATHER_SCALE = 2.5;
 export const SCATTER_RETRIGGER_SCALE = 1.5;
 
 /** Y position offset for symbol 0 (scatter) in pixels (positive = down, negative = up) */
-export const SYMBOL_0_Y_OFFSET = -10;
+export const SYMBOL_0_Y_OFFSET = -20;
 
 // ============================================================================
 // DEPTH VALUES (Z-ordering)
